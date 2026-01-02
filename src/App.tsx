@@ -16,6 +16,16 @@ import Patients from "./pages/Patients";
 import PatientRegistration from "./pages/PatientRegistration";
 import Vitals from "./pages/Vitals";
 import Appointments from "./pages/Appointments";
+import LabOrders from "./pages/LabOrders";
+import LabResults from "./pages/LabResults";
+import Prescriptions from "./pages/Prescriptions";
+import Pharmacy from "./pages/Pharmacy";
+import Surgeries from "./pages/Surgeries";
+import ICU from "./pages/ICU";
+import FollowUps from "./pages/FollowUps";
+import UserManagement from "./pages/UserManagement";
+import Settings from "./pages/Settings";
+import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,6 +54,24 @@ const App = () => (
                     <ProtectedRoute allowedRoles={['admin', 'nurse']}><Vitals /></ProtectedRoute>
                   } />
                   <Route path="/appointments" element={<Appointments />} />
+                  <Route path="/lab/orders" element={<LabOrders />} />
+                  <Route path="/lab/results" element={
+                    <ProtectedRoute allowedRoles={['admin', 'lab_technician']}><LabResults /></ProtectedRoute>
+                  } />
+                  <Route path="/prescriptions" element={<Prescriptions />} />
+                  <Route path="/pharmacy" element={
+                    <ProtectedRoute allowedRoles={['admin', 'pharmacist']}><Pharmacy /></ProtectedRoute>
+                  } />
+                  <Route path="/surgeries" element={<Surgeries />} />
+                  <Route path="/icu" element={<ICU />} />
+                  <Route path="/follow-ups" element={<FollowUps />} />
+                  <Route path="/admin/users" element={
+                    <ProtectedRoute allowedRoles={['admin']}><UserManagement /></ProtectedRoute>
+                  } />
+                  <Route path="/settings" element={
+                    <ProtectedRoute allowedRoles={['admin']}><Settings /></ProtectedRoute>
+                  } />
+                  <Route path="/reports" element={<Reports />} />
                 </Route>
 
                 <Route path="*" element={<NotFound />} />
