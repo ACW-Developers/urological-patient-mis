@@ -27,7 +27,9 @@ import UserManagement from "./pages/UserManagement";
 import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
 import DoctorPatients from "./pages/DoctorPatients";
+import DoctorSchedule from "./pages/DoctorSchedule";
 import PatientDetail from "./pages/PatientDetail";
+import SurgeryWorkflow from "./pages/SurgeryWorkflow";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -60,6 +62,9 @@ const App = () => (
                   <Route path="/doctor/patients" element={
                     <ProtectedRoute allowedRoles={['doctor']}><DoctorPatients /></ProtectedRoute>
                   } />
+                  <Route path="/doctor/schedule" element={
+                    <ProtectedRoute allowedRoles={['doctor']}><DoctorSchedule /></ProtectedRoute>
+                  } />
                   <Route path="/lab/orders" element={<LabOrders />} />
                   <Route path="/lab/results" element={
                     <ProtectedRoute allowedRoles={['admin', 'lab_technician']}><LabResults /></ProtectedRoute>
@@ -69,6 +74,9 @@ const App = () => (
                     <ProtectedRoute allowedRoles={['admin', 'pharmacist']}><Pharmacy /></ProtectedRoute>
                   } />
                   <Route path="/surgeries" element={<Surgeries />} />
+                  <Route path="/surgeries/:id" element={
+                    <ProtectedRoute allowedRoles={['admin', 'doctor', 'nurse']}><SurgeryWorkflow /></ProtectedRoute>
+                  } />
                   <Route path="/icu" element={<ICU />} />
                   <Route path="/follow-ups" element={<FollowUps />} />
                   <Route path="/admin/users" element={
