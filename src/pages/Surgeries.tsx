@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Plus, Syringe, Search, ClipboardCheck, Play, CheckCircle } from 'lucide-react';
+import { Plus, Syringe, Search, ClipboardCheck, Play, CheckCircle, FileEdit } from 'lucide-react';
 import type { Surgery, Patient, Profile } from '@/types/database';
 
 const surgeryTypes = [
@@ -38,6 +39,7 @@ const whoChecklistItems = [
 ];
 
 export default function Surgeries() {
+  const navigate = useNavigate();
   const { user, role } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
@@ -377,7 +379,14 @@ export default function Surgeries() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => navigate(`/surgeries/${surgery.id}`)}
+                          >
+                            <FileEdit className="h-4 w-4 mr-1" /> Manage
+                          </Button>
                           {surgery.status === 'scheduled' && !surgery.who_checklist_completed && (
                             <Button
                               size="sm"

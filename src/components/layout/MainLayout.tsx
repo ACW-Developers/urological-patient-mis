@@ -15,11 +15,11 @@ function MainLayoutContent() {
     <div className="min-h-screen bg-background">
       <Sidebar />
       <div className={cn(
-        'transition-all duration-300 flex flex-col min-h-screen',
+        'transition-all duration-300 flex flex-col min-h-screen w-full',
         isMobile ? 'pl-0' : collapsed ? 'md:pl-14' : 'md:pl-56'
       )}>
         <Navbar />
-        <main className="flex-1 p-3 sm:p-4 lg:p-6">
+        <main className="flex-1 p-3 sm:p-4 lg:p-6 w-full max-w-full overflow-x-hidden">
           <Outlet />
         </main>
         <footer className="border-t border-border py-3 px-3 sm:px-4 text-center text-xs text-muted-foreground">
