@@ -1,4 +1,4 @@
-import { Bell, Moon, Sun, LogOut, User, Menu } from 'lucide-react';
+import { Bell, Moon, Sun, LogOut, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/hooks/useNotifications';
+import { MobileSidebarTrigger } from './Sidebar';
 
 export function Navbar() {
   const { profile, role, signOut } = useAuth();
@@ -40,10 +41,11 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-30 h-16 bg-background/80 backdrop-blur-xl border-b border-border">
-      <div className="flex items-center justify-between h-full px-6">
-        <div className="flex items-center gap-4">
-          <h2 className="font-display font-semibold text-foreground/80">
-            Welcome back, {profile?.first_name || 'User'}
+      <div className="flex items-center justify-between h-full px-4 sm:px-6">
+        <div className="flex items-center gap-3">
+          <MobileSidebarTrigger />
+          <h2 className="font-display font-semibold text-foreground/80 text-sm sm:text-base truncate">
+            Welcome, {profile?.first_name || 'User'}
           </h2>
         </div>
 

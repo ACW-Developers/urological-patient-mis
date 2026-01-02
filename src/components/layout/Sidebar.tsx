@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
   LayoutDashboard,
   Users,
@@ -21,9 +22,12 @@ import {
   Shield,
   BarChart3,
   BedDouble,
+  Menu,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 
 interface NavItem {
   label: string;
@@ -51,7 +55,61 @@ const navItems: NavItem[] = [
   { label: 'Settings', icon: Settings, path: '/settings', roles: ['admin'] },
 ];
 
-export function Sidebar() {
+// Mobile sidebar content
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+  const { role } = useAuth();
+  const { settings } = useSettings();
+  const location = useLocation();
+
+  const filteredItems = navItems.filter(item => 
+    role && item.roles.includes(role)
+  );
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className="flex items-center h-16 px-4 border-b border-sidebar-border">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center glow-primary">
+            <Heart className="w-5 h-5 text-primary-foreground" />
+          </div>
+          <span className="font-display font-bold text-lg text-sidebar-foreground truncate">
+            {settings?.site_name || 'CardioRegistry'}
+          </span>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto scrollbar-thin py-4 px-3">
+        <ul className="space-y-1">
+          {filteredItems.map((item) => {
+            const isActive = location.pathname === item.path || 
+              (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
+            
+            return (
+              <li key={item.path}>
+                <NavLink
+                  to={item.path}
+                  onClick={onNavigate}
+                  className={cn(
+                    'sidebar-item',
+                    isActive && 'sidebar-item-active'
+                  )}
+                >
+                  <item.icon className="w-5 h-5 flex-shrink-0" />
+                  <span className="truncate">{item.label}</span>
+                </NavLink>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+    </div>
+  );
+}
+
+// Desktop sidebar
+function DesktopSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { role } = useAuth();
   const { settings } = useSettings();
@@ -64,8 +122,8 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 z-40 h-screen transition-all duration-300 ease-in-out',
-        'bg-sidebar flex flex-col border-r border-sidebar-border',
+        'fixed left-0 top-0 z-40 h-screen transition-all duration-300 ease-in-out hidden md:flex',
+        'bg-sidebar flex-col border-r border-sidebar-border',
         collapsed ? 'w-20' : 'w-64'
       )}
       style={{ background: 'var(--gradient-sidebar)' }}
@@ -155,4 +213,47 @@ export function Sidebar() {
       </div>
     </aside>
   );
+}
+
+// Mobile sidebar trigger
+export function MobileSidebarTrigger() {
+  const [open, setOpen] = useState(false);
+  const isMobile = useIsMobile();
+
+  // Close sidebar on route change
+  const location = useLocation();
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
+
+  if (!isMobile) return null;
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden"
+        >
+          <Menu className="w-5 h-5" />
+          <span className="sr-only">Toggle menu</span>
+        </Button>
+      </SheetTrigger>
+      <SheetContent 
+        side="left" 
+        className="p-0 w-72 bg-sidebar border-sidebar-border"
+        style={{ background: 'var(--gradient-sidebar)' }}
+      >
+        <SheetHeader className="sr-only">
+          <SheetTitle>Navigation Menu</SheetTitle>
+        </SheetHeader>
+        <SidebarContent onNavigate={() => setOpen(false)} />
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+export function Sidebar() {
+  return <DesktopSidebar />;
 }
