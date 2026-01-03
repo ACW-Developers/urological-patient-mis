@@ -270,15 +270,22 @@ export default function Appointments() {
     return !!(formData.patientId && formData.doctorId && formData.appointmentTime);
   }, [formData.patientId, formData.doctorId, formData.appointmentTime]);
 
-  // Fetch appointments for display
+  // Fetch appointments for display - filter by doctor if user is a doctor
   const { data: appointments, isLoading } = useQuery({
-    queryKey: ['appointments', format(selectedDate, 'yyyy-MM-dd')],
+    queryKey: ['appointments', format(selectedDate, 'yyyy-MM-dd'), role, user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('appointments')
         .select('*')
         .eq('appointment_date', format(selectedDate, 'yyyy-MM-dd'))
         .order('appointment_time');
+      
+      // If user is a doctor, only show their appointments
+      if (role === 'doctor' && user?.id) {
+        query = query.eq('doctor_id', user.id);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
 
       const patientIds = [...new Set(data.map(a => a.patient_id))];
