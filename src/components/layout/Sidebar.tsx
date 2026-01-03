@@ -46,6 +46,7 @@ const navItems: NavItem[] = [
   { label: 'My Schedule', icon: Clock, path: '/doctor/schedule', roles: ['doctor'] },
   { label: 'Lab Orders', icon: FlaskConical, path: '/lab/orders', roles: ['admin', 'doctor', 'lab_technician'] },
   { label: 'Lab Results', icon: ClipboardList, path: '/lab/results', roles: ['admin', 'lab_technician'] },
+  { label: 'Lab Results', icon: ClipboardList, path: '/doctor/lab-results', roles: ['doctor'] },
   { label: 'Prescriptions', icon: Pill, path: '/prescriptions', roles: ['admin', 'doctor', 'pharmacist'] },
   { label: 'Pharmacy', icon: Pill, path: '/pharmacy', roles: ['admin', 'pharmacist'] },
   { label: 'Surgeries', icon: Syringe, path: '/surgeries', roles: ['admin', 'doctor', 'nurse'] },

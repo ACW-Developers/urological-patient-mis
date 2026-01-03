@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,13 +12,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Calendar as CalendarIcon, Plus, Loader2, Clock, AlertCircle } from 'lucide-react';
+import { Calendar as CalendarIcon, Plus, Loader2, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format, addDays, getDay } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { notifyDoctor } from '@/lib/notifications';
+
 interface DoctorSchedule {
   id: string;
   doctor_id: string;
@@ -26,6 +27,125 @@ interface DoctorSchedule {
   start_time: string;
   end_time: string;
   is_available: boolean;
+}
+
+// Component to generate appointment slots for the next 14 days
+function AppointmentSlotOptions({ 
+  doctorId, 
+  doctorSchedules 
+}: { 
+  doctorId: string; 
+  doctorSchedules: DoctorSchedule[]; 
+}) {
+  const [existingAppointments, setExistingAppointments] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      const today = new Date();
+      const endDate = addDays(today, 14);
+      
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('appointment_date, appointment_time')
+        .eq('doctor_id', doctorId)
+        .gte('appointment_date', format(today, 'yyyy-MM-dd'))
+        .lte('appointment_date', format(endDate, 'yyyy-MM-dd'))
+        .neq('status', 'cancelled');
+
+      if (!error && data) {
+        const grouped: Record<string, string[]> = {};
+        data.forEach(apt => {
+          const dateKey = apt.appointment_date;
+          if (!grouped[dateKey]) grouped[dateKey] = [];
+          grouped[dateKey].push(apt.appointment_time?.slice(0, 5) || '');
+        });
+        setExistingAppointments(grouped);
+      }
+    };
+
+    fetchAppointments();
+  }, [doctorId]);
+
+  const slots: { date: Date; time: string; label: string }[] = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (let d = 0; d < 14; d++) {
+    const date = addDays(today, d);
+    const dayOfWeek = getDay(date);
+    const dateKey = format(date, 'yyyy-MM-dd');
+    
+    const schedule = doctorSchedules.find(
+      s => s.doctor_id === doctorId && s.day_of_week === dayOfWeek
+    );
+
+    if (schedule) {
+      const startHour = parseInt(schedule.start_time.split(':')[0]);
+      const endHour = parseInt(schedule.end_time.split(':')[0]);
+      const bookedTimes = existingAppointments[dateKey] || [];
+
+      for (let h = startHour; h < endHour; h++) {
+        for (let m = 0; m < 60; m += 30) {
+          const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+          if (!bookedTimes.includes(time)) {
+            // Skip past times for today
+            if (d === 0) {
+              const now = new Date();
+              const slotTime = new Date(date);
+              slotTime.setHours(h, m);
+              if (slotTime <= now) continue;
+            }
+            
+            slots.push({
+              date,
+              time,
+              label: `${format(date, 'EEE, MMM d')} at ${time}`
+            });
+          }
+        }
+      }
+    }
+  }
+
+  if (slots.length === 0) {
+    return (
+      <SelectItem value="no-slots" disabled className="text-sm text-muted-foreground">
+        No available slots in the next 2 weeks
+      </SelectItem>
+    );
+  }
+
+  // Group by date
+  const groupedSlots: Record<string, typeof slots> = {};
+  slots.forEach(slot => {
+    const key = format(slot.date, 'yyyy-MM-dd');
+    if (!groupedSlots[key]) groupedSlots[key] = [];
+    groupedSlots[key].push(slot);
+  });
+
+  return (
+    <>
+      {Object.entries(groupedSlots).map(([dateKey, dateSlots]) => (
+        <div key={dateKey}>
+          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50 sticky top-0">
+            {format(new Date(dateKey), 'EEEE, MMMM d, yyyy')}
+          </div>
+          {dateSlots.map((slot) => (
+            <SelectItem 
+              key={`${dateKey}|${slot.time}`} 
+              value={`${dateKey}|${slot.time}`}
+              className="text-sm"
+            >
+              <span className="flex items-center gap-2">
+                <Clock className="w-3 h-3 text-muted-foreground" />
+                {slot.time}
+              </span>
+            </SelectItem>
+          ))}
+        </div>
+      ))}
+    </>
+  );
 }
 
 export default function Appointments() {
@@ -337,57 +457,43 @@ export default function Appointments() {
                   </Select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Date *</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm">
-                          <CalendarIcon className="mr-2 h-3 w-3" />
-                          {format(formData.appointmentDate, 'PP')}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={formData.appointmentDate}
-                          onSelect={handleDateChange}
-                          disabled={(date) => date < new Date()}
-                          initialFocus
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Appointment Slot *</Label>
+                  {formData.doctorId ? (
+                    <Select 
+                      value={formData.appointmentTime ? `${format(formData.appointmentDate, 'yyyy-MM-dd')}|${formData.appointmentTime}` : ''} 
+                      onValueChange={(v) => {
+                        const [date, time] = v.split('|');
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          appointmentDate: new Date(date),
+                          appointmentTime: time 
+                        }));
+                      }}
+                    >
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue placeholder="Select day, date & time">
+                          {formData.appointmentTime && (
+                            <span className="flex items-center gap-1">
+                              <CalendarIcon className="w-3 h-3" />
+                              {format(formData.appointmentDate, 'EEE, MMM d')} at {formData.appointmentTime}
+                            </span>
+                          )}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[300px]">
+                        <AppointmentSlotOptions 
+                          doctorId={formData.doctorId}
+                          doctorSchedules={doctorSchedules || []}
                         />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Time *</Label>
-                    {!hasSchedule && formData.doctorId ? (
-                      <div className="flex items-center gap-1 text-xs text-warning h-9 px-2 border rounded-md bg-warning/5">
-                        <AlertCircle className="w-3 h-3" />
-                        <span>Not available</span>
-                      </div>
-                    ) : availableTimeSlots.length === 0 && formData.doctorId ? (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground h-9 px-2 border rounded-md">
-                        <Clock className="w-3 h-3" />
-                        <span>No slots</span>
-                      </div>
-                    ) : (
-                      <Select 
-                        value={formData.appointmentTime} 
-                        onValueChange={(v) => setFormData(prev => ({ ...prev, appointmentTime: v }))}
-                        disabled={!formData.doctorId || availableTimeSlots.length === 0}
-                      >
-                        <SelectTrigger className="h-9 text-sm">
-                          <SelectValue placeholder="Select time" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableTimeSlots.map((time) => (
-                            <SelectItem key={time} value={time} className="text-sm">{time}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  </div>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground h-9 px-2 border rounded-md">
+                      <CalendarIcon className="w-3 h-3" />
+                      <span>Select a doctor first</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
