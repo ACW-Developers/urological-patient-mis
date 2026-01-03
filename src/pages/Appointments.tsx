@@ -415,9 +415,17 @@ export default function Appointments() {
           <h1 className="page-title flex items-center gap-2">
             <CalendarIcon className="w-6 h-6 text-primary" />
             Appointments
+            {role === 'doctor' && (
+              <Badge variant="secondary" className="ml-2 text-xs font-normal">
+                My Appointments
+              </Badge>
+            )}
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Schedule and manage patient appointments
+            {role === 'doctor' 
+              ? 'View and manage your scheduled appointments'
+              : 'Schedule and manage patient appointments'
+            }
           </p>
         </div>
         {role && ['admin', 'nurse'].includes(role) && (
