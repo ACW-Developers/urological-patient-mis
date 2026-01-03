@@ -265,14 +265,10 @@ export default function Appointments() {
     return slots;
   }, [formData.doctorId, formData.appointmentDate, doctorSchedules, existingAppointments]);
 
-  // Check if selected doctor has schedule for selected day
-  const hasSchedule = useMemo(() => {
-    if (!formData.doctorId || !doctorSchedules) return true;
-    const dayOfWeek = getDay(formData.appointmentDate);
-    return doctorSchedules.some(
-      s => s.doctor_id === formData.doctorId && s.day_of_week === dayOfWeek
-    );
-  }, [formData.doctorId, formData.appointmentDate, doctorSchedules]);
+  // Check if form is valid for submission
+  const isFormValid = useMemo(() => {
+    return !!(formData.patientId && formData.doctorId && formData.appointmentTime);
+  }, [formData.patientId, formData.doctorId, formData.appointmentTime]);
 
   // Fetch appointments for display
   const { data: appointments, isLoading } = useQuery({
@@ -535,7 +531,7 @@ export default function Appointments() {
                     type="submit" 
                     className="gradient-primary" 
                     size="sm"
-                    disabled={loading || !formData.appointmentTime || !hasSchedule}
+                    disabled={loading || !isFormValid}
                   >
                     {loading && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
                     Schedule
