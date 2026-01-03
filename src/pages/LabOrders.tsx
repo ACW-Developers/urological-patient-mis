@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Plus, FlaskConical, Search, Eye, ClipboardCheck } from 'lucide-react';
 import type { LabTest, Patient } from '@/types/database';
+import { notifyLabTechnicians } from '@/lib/notifications';
 
 const testTypes = [
   { type: 'blood', tests: ['Complete Blood Count (CBC)', 'Lipid Panel', 'Cardiac Enzymes', 'BMP', 'CMP', 'Coagulation Panel'] },
@@ -62,19 +63,28 @@ export default function LabOrders() {
 
   const orderTestMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from('lab_tests').insert({
+      // Get patient name for notification
+      const patientData = patients?.find(p => p.id === selectedPatient);
+      const patientName = patientData ? `${patientData.first_name} ${patientData.last_name}` : 'Patient';
+
+      const { data: newTest, error } = await supabase.from('lab_tests').insert({
         patient_id: selectedPatient,
         ordered_by: user?.id,
         test_type: selectedTestType,
         test_name: selectedTest,
         priority,
         notes,
-      });
+      }).select().single();
       if (error) throw error;
+
+      // Notify lab technicians about the new order
+      await notifyLabTechnicians(newTest.id, patientName, selectedTest, priority);
+
+      return newTest;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lab-tests'] });
-      toast.success('Lab test ordered successfully');
+      toast.success('Lab test ordered and lab technicians notified');
       setDialogOpen(false);
       resetForm();
     },
