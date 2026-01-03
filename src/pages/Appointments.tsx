@@ -42,7 +42,7 @@ function AppointmentSlotOptions({
   useEffect(() => {
     const fetchAppointments = async () => {
       const today = new Date();
-      const endDate = addDays(today, 14);
+      const endDate = addDays(today, 7);
       
       const { data, error } = await supabase
         .from('appointments')
@@ -68,40 +68,45 @@ function AppointmentSlotOptions({
 
   const slots: { date: Date; time: string; label: string }[] = [];
   const today = new Date();
+  const now = new Date();
   today.setHours(0, 0, 0, 0);
 
-  for (let d = 0; d < 14; d++) {
+  // Generate slots for the next 7 days
+  for (let d = 0; d <= 7; d++) {
     const date = addDays(today, d);
     const dayOfWeek = getDay(date);
     const dateKey = format(date, 'yyyy-MM-dd');
     
-    const schedule = doctorSchedules.find(
-      s => s.doctor_id === doctorId && s.day_of_week === dayOfWeek
+    // Find doctor's schedule for this day, or use default hours (9 AM - 5 PM)
+    const schedule = doctorSchedules?.find(
+      s => s.doctor_id === doctorId && s.day_of_week === dayOfWeek && s.is_available
     );
 
-    if (schedule) {
-      const startHour = parseInt(schedule.start_time.split(':')[0]);
-      const endHour = parseInt(schedule.end_time.split(':')[0]);
-      const bookedTimes = existingAppointments[dateKey] || [];
+    // Use schedule hours if available, otherwise default to 9 AM - 5 PM (skip Sunday = 0)
+    const startHour = schedule ? parseInt(schedule.start_time.split(':')[0]) : 9;
+    const endHour = schedule ? parseInt(schedule.end_time.split(':')[0]) : 17;
+    
+    // Skip if no schedule and it's a Sunday
+    if (!schedule && dayOfWeek === 0) continue;
+    
+    const bookedTimes = existingAppointments[dateKey] || [];
 
-      for (let h = startHour; h < endHour; h++) {
-        for (let m = 0; m < 60; m += 30) {
-          const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-          if (!bookedTimes.includes(time)) {
-            // Skip past times for today
-            if (d === 0) {
-              const now = new Date();
-              const slotTime = new Date(date);
-              slotTime.setHours(h, m);
-              if (slotTime <= now) continue;
-            }
-            
-            slots.push({
-              date,
-              time,
-              label: `${format(date, 'EEE, MMM d')} at ${time}`
-            });
+    for (let h = startHour; h < endHour; h++) {
+      for (let m = 0; m < 60; m += 30) {
+        const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+        if (!bookedTimes.includes(time)) {
+          // Skip past times for today
+          if (d === 0) {
+            const slotTime = new Date(date);
+            slotTime.setHours(h, m);
+            if (slotTime <= now) continue;
           }
+          
+          slots.push({
+            date,
+            time,
+            label: `${format(date, 'EEE, MMM d')} at ${time}`
+          });
         }
       }
     }
@@ -110,7 +115,7 @@ function AppointmentSlotOptions({
   if (slots.length === 0) {
     return (
       <SelectItem value="no-slots" disabled className="text-sm text-muted-foreground">
-        No available slots in the next 2 weeks
+        No available slots in the next 7 days
       </SelectItem>
     );
   }
