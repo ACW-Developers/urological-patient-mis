@@ -18,7 +18,7 @@ import { format, addDays, getDay } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-
+import { notifyDoctor } from '@/lib/notifications';
 interface DoctorSchedule {
   id: string;
   doctor_id: string;
@@ -182,7 +182,11 @@ export default function Appointments() {
 
     setLoading(true);
     try {
-      const { error } = await supabase.from('appointments').insert({
+      // Get patient name for notification
+      const selectedPatient = patients?.find(p => p.id === formData.patientId);
+      const patientName = selectedPatient ? `${selectedPatient.first_name} ${selectedPatient.last_name}` : 'Patient';
+
+      const { data: newAppointment, error } = await supabase.from('appointments').insert({
         patient_id: formData.patientId,
         doctor_id: formData.doctorId,
         scheduled_by: user.id,
@@ -190,13 +194,22 @@ export default function Appointments() {
         appointment_time: formData.appointmentTime,
         type: formData.type,
         notes: formData.notes || null,
-      });
+      }).select().single();
 
       if (error) throw error;
 
+      // Notify the doctor about the new appointment
+      await notifyDoctor(formData.doctorId, {
+        title: 'New Appointment Scheduled',
+        message: `Appointment with ${patientName} on ${format(formData.appointmentDate, 'MMM d, yyyy')} at ${formData.appointmentTime}. Type: ${formData.type}`,
+        type: 'info',
+        relatedEntityType: 'appointment',
+        relatedEntityId: newAppointment.id,
+      });
+
       toast({
         title: 'Appointment Scheduled',
-        description: 'The appointment has been successfully scheduled.',
+        description: 'The appointment has been successfully scheduled and the doctor has been notified.',
       });
 
       queryClient.invalidateQueries({ queryKey: ['appointments'] });

@@ -14,7 +14,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Patient, Vitals, LabTest, Prescription, Surgery } from '@/types/database';
 
-type ReportType = 'patients' | 'vitals' | 'lab_tests' | 'prescriptions' | 'surgeries' | 'summary';
+type ReportType = 'patients' | 'vitals' | 'lab_tests' | 'prescriptions' | 'surgeries' | 'appointments' | 'icu' | 'summary';
 
 const reportTypes: { value: ReportType; label: string; icon: React.ElementType; description: string }[] = [
   { value: 'patients', label: 'Patient Registry', icon: Users, description: 'List of all registered patients' },
@@ -22,6 +22,8 @@ const reportTypes: { value: ReportType; label: string; icon: React.ElementType; 
   { value: 'lab_tests', label: 'Lab Tests Report', icon: FlaskConical, description: 'Laboratory test orders and results' },
   { value: 'prescriptions', label: 'Prescriptions Report', icon: Pill, description: 'Prescription records' },
   { value: 'surgeries', label: 'Surgeries Report', icon: Syringe, description: 'Surgical procedures log' },
+  { value: 'appointments', label: 'Appointments Report', icon: Users, description: 'Appointment schedules' },
+  { value: 'icu', label: 'ICU Report', icon: Activity, description: 'ICU admissions and progress' },
   { value: 'summary', label: 'Summary Report', icon: BarChart3, description: 'Overall system statistics' },
 ];
 
@@ -92,6 +94,34 @@ export default function Reports() {
         .gte('scheduled_date', startDate)
         .lte('scheduled_date', endDate)
         .order('scheduled_date', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: appointments } = useQuery({
+    queryKey: ['all-appointments', startDate, endDate],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('*, patient:patients(first_name, last_name, patient_number)')
+        .gte('appointment_date', startDate)
+        .lte('appointment_date', endDate)
+        .order('appointment_date', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: icuAdmissions } = useQuery({
+    queryKey: ['all-icu', startDate, endDate],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('icu_admissions')
+        .select('*, patient:patients(first_name, last_name, patient_number)')
+        .gte('admitted_at', startDate)
+        .lte('admitted_at', endDate + 'T23:59:59')
+        .order('admitted_at', { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -206,6 +236,39 @@ export default function Reports() {
           });
           break;
 
+        case 'appointments':
+          autoTable(doc, {
+            startY,
+            head: [['Patient', 'Date', 'Time', 'Type', 'Status']],
+            body: appointments?.map((a: any) => [
+              `${a.patient?.first_name} ${a.patient?.last_name}`,
+              format(new Date(a.appointment_date), 'MMM d, yyyy'),
+              a.appointment_time?.slice(0, 5) || '-',
+              a.type || '-',
+              a.status,
+            ]) || [],
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [220, 38, 38] },
+          });
+          break;
+
+        case 'icu':
+          autoTable(doc, {
+            startY,
+            head: [['Patient', 'Bed', 'Admission Reason', 'Admitted', 'Discharged', 'Status']],
+            body: icuAdmissions?.map((i: any) => [
+              `${i.patient?.first_name} ${i.patient?.last_name}`,
+              i.bed_number || '-',
+              i.admission_reason,
+              format(new Date(i.admitted_at), 'MMM d, yyyy'),
+              i.discharged_at ? format(new Date(i.discharged_at), 'MMM d, yyyy') : 'Active',
+              i.status,
+            ]) || [],
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [220, 38, 38] },
+          });
+          break;
+
         case 'summary':
           doc.setFontSize(12);
           doc.text('System Statistics', 14, startY);
@@ -220,6 +283,8 @@ export default function Reports() {
             ['Pending Dispensing', String(prescriptions?.filter((p: any) => p.status === 'pending').length || 0)],
             ['Surgeries (Period)', String(surgeries?.length || 0)],
             ['Completed Surgeries', String(surgeries?.filter((s: any) => s.status === 'completed').length || 0)],
+            ['Appointments (Period)', String(appointments?.length || 0)],
+            ['ICU Admissions (Period)', String(icuAdmissions?.length || 0)],
           ];
 
           autoTable(doc, {
@@ -338,7 +403,7 @@ export default function Reports() {
           <CardTitle>Quick Stats</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
             <div className="text-center p-4 bg-muted/50 rounded-lg">
               <div className="text-2xl font-bold">{patients?.length || 0}</div>
               <div className="text-sm text-muted-foreground">Total Patients</div>
@@ -358,6 +423,14 @@ export default function Reports() {
             <div className="text-center p-4 bg-muted/50 rounded-lg">
               <div className="text-2xl font-bold">{surgeries?.length || 0}</div>
               <div className="text-sm text-muted-foreground">Surgeries (Period)</div>
+            </div>
+            <div className="text-center p-4 bg-muted/50 rounded-lg">
+              <div className="text-2xl font-bold">{appointments?.length || 0}</div>
+              <div className="text-sm text-muted-foreground">Appointments (Period)</div>
+            </div>
+            <div className="text-center p-4 bg-muted/50 rounded-lg">
+              <div className="text-2xl font-bold">{icuAdmissions?.length || 0}</div>
+              <div className="text-sm text-muted-foreground">ICU (Period)</div>
             </div>
           </div>
         </CardContent>

@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Plus, Pill, Search, Eye, Trash2 } from 'lucide-react';
 import type { Prescription, PrescriptionItem, Patient } from '@/types/database';
+import { notifyPharmacists } from '@/lib/notifications';
 
 const commonMedications = [
   'Aspirin', 'Clopidogrel', 'Warfarin', 'Atorvastatin', 'Metoprolol',
@@ -83,6 +84,10 @@ export default function Prescriptions() {
       if (validItems.length === 0) {
         throw new Error('Please add at least one medication');
       }
+
+      // Get patient name for notification
+      const patientData = patients?.find(p => p.id === selectedPatient);
+      const patientName = patientData ? `${patientData.first_name} ${patientData.last_name}` : 'Patient';
       
       // Create prescription
       const { data: prescription, error: prescriptionError } = await supabase
@@ -109,10 +114,15 @@ export default function Prescriptions() {
         }))
       );
       if (itemsError) throw itemsError;
+
+      // Notify pharmacists about the new prescription
+      await notifyPharmacists(prescription.id, patientName);
+
+      return prescription;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
-      toast.success('Prescription created successfully');
+      toast.success('Prescription created and pharmacy notified');
       setDialogOpen(false);
       resetForm();
     },

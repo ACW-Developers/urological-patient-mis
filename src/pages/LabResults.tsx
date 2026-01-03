@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { FlaskConical, Search, Plus, FileText } from 'lucide-react';
 import type { LabTest, LabResult, Patient } from '@/types/database';
+import { notifyDoctorLabResults } from '@/lib/notifications';
 
 export default function LabResults() {
   const { user } = useAuth();
@@ -73,11 +74,26 @@ export default function LabResults() {
       
       // Mark test as completed
       await supabase.from('lab_tests').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', selectedTest.id);
+
+      // Check if any results are abnormal
+      const hasAbnormal = validResults.some(r => r.is_abnormal);
+      const patientName = selectedTest.patient ? `${selectedTest.patient.first_name} ${selectedTest.patient.last_name}` : 'Patient';
+
+      // Notify the ordering doctor about results
+      if (selectedTest.ordered_by) {
+        await notifyDoctorLabResults(
+          selectedTest.ordered_by,
+          selectedTest.id,
+          patientName,
+          selectedTest.test_name,
+          hasAbnormal
+        );
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lab-tests-for-results'] });
       queryClient.invalidateQueries({ queryKey: ['lab-results'] });
-      toast.success('Results saved successfully');
+      toast.success('Results saved and doctor notified');
       setSelectedTest(null);
       setResults([{ parameter_name: '', value: '', unit: '', reference_range: '', is_abnormal: false }]);
     },
