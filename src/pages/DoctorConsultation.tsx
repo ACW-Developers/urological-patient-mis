@@ -80,17 +80,23 @@ export default function DoctorConsultationPage() {
   const [decision, setDecision] = useState<'prescription' | 'surgery' | ''>('');
   const [surgeryNotes, setSurgeryNotes] = useState('');
 
-  // Fetch completed appointments for the doctor that need consultation
+  // Fetch confirmed appointments (accepted by doctor) that need consultation
   const { data: appointments, isLoading } = useQuery({
-    queryKey: ['doctor-consultation-appointments', user?.id],
+    queryKey: ['doctor-consultation-appointments', user?.id, role],
     queryFn: async () => {
       if (!user?.id) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from('appointments')
         .select('*, patient:patients(*)')
-        .eq('doctor_id', user.id)
-        .in('status', ['scheduled', 'completed'])
+        .eq('status', 'confirmed')
         .order('appointment_date', { ascending: false });
+      
+      // Admin can see all confirmed appointments, doctors only see their own
+      if (role !== 'admin') {
+        query = query.eq('doctor_id', user.id);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -99,14 +105,20 @@ export default function DoctorConsultationPage() {
 
   // Fetch existing consultations
   const { data: consultations } = useQuery({
-    queryKey: ['doctor-consultations', user?.id],
+    queryKey: ['doctor-consultations', user?.id, role],
     queryFn: async () => {
       if (!user?.id) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from('doctor_consultations')
         .select('*')
-        .eq('doctor_id', user.id)
         .order('created_at', { ascending: false });
+      
+      // Admin can see all consultations, doctors only see their own
+      if (role !== 'admin') {
+        query = query.eq('doctor_id', user.id);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data as DoctorConsultation[];
     },

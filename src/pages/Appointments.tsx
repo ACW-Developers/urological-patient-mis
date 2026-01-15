@@ -386,6 +386,7 @@ export default function Appointments() {
   const getStatusBadge = (status: string) => {
     const variants: Record<string, string> = {
       scheduled: 'bg-info/10 text-info',
+      confirmed: 'bg-primary/10 text-primary',
       completed: 'bg-success/10 text-success',
       cancelled: 'bg-destructive/10 text-destructive',
       'no-show': 'bg-warning/10 text-warning',
@@ -651,25 +652,49 @@ export default function Appointments() {
                       <TableCell className="py-2">{getStatusBadge(apt.status)}</TableCell>
                       <TableCell className="py-2">
                         <div className="flex items-center gap-1">
-                          {apt.status === 'scheduled' && (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs px-2"
-                                onClick={() => updateStatus(apt.id, 'completed')}
-                              >
-                                Complete
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs px-2"
-                                onClick={() => updateStatus(apt.id, 'cancelled')}
-                              >
-                                Cancel
-                              </Button>
-                            </>
+                          {/* Doctors can confirm scheduled appointments */}
+                          {apt.status === 'scheduled' && role === 'doctor' && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="h-7 text-xs px-2"
+                              onClick={() => updateStatus(apt.id, 'confirmed')}
+                            >
+                              Accept
+                            </Button>
+                          )}
+                          {/* Confirmed appointments can be completed */}
+                          {apt.status === 'confirmed' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs px-2"
+                              onClick={() => updateStatus(apt.id, 'completed')}
+                            >
+                              Complete
+                            </Button>
+                          )}
+                          {/* Admin/nurse can manage scheduled appointments */}
+                          {apt.status === 'scheduled' && role !== 'doctor' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs px-2"
+                              onClick={() => updateStatus(apt.id, 'completed')}
+                            >
+                              Complete
+                            </Button>
+                          )}
+                          {/* Anyone can cancel scheduled or confirmed appointments */}
+                          {(apt.status === 'scheduled' || apt.status === 'confirmed') && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs px-2 text-destructive hover:text-destructive"
+                              onClick={() => updateStatus(apt.id, 'cancelled')}
+                            >
+                              Cancel
+                            </Button>
                           )}
                         </div>
                       </TableCell>
