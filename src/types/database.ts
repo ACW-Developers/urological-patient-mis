@@ -9,6 +9,29 @@ export interface Profile {
   phone?: string;
   department?: string;
   avatar_url?: string;
+  is_active?: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DoctorConsultation {
+  id: string;
+  appointment_id: string;
+  patient_id: string;
+  doctor_id: string;
+  consultation_date: string;
+  chief_complaint?: string;
+  clinical_findings?: string;
+  diagnosis?: string;
+  treatment_plan?: string;
+  requires_lab_tests: boolean;
+  lab_tests_ordered?: string[];
+  lab_results_reviewed: boolean;
+  requires_surgery: boolean;
+  surgery_referral_notes?: string;
+  requires_prescription: boolean;
+  status: string;
+  notes?: string;
   created_at: string;
   updated_at: string;
 }

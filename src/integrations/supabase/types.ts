@@ -67,6 +67,87 @@ export type Database = {
           },
         ]
       }
+      doctor_consultations: {
+        Row: {
+          appointment_id: string
+          chief_complaint: string | null
+          clinical_findings: string | null
+          consultation_date: string | null
+          created_at: string | null
+          diagnosis: string | null
+          doctor_id: string
+          id: string
+          lab_results_reviewed: boolean | null
+          lab_tests_ordered: string[] | null
+          notes: string | null
+          patient_id: string
+          requires_lab_tests: boolean | null
+          requires_prescription: boolean | null
+          requires_surgery: boolean | null
+          status: string | null
+          surgery_referral_notes: string | null
+          treatment_plan: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          appointment_id: string
+          chief_complaint?: string | null
+          clinical_findings?: string | null
+          consultation_date?: string | null
+          created_at?: string | null
+          diagnosis?: string | null
+          doctor_id: string
+          id?: string
+          lab_results_reviewed?: boolean | null
+          lab_tests_ordered?: string[] | null
+          notes?: string | null
+          patient_id: string
+          requires_lab_tests?: boolean | null
+          requires_prescription?: boolean | null
+          requires_surgery?: boolean | null
+          status?: string | null
+          surgery_referral_notes?: string | null
+          treatment_plan?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          appointment_id?: string
+          chief_complaint?: string | null
+          clinical_findings?: string | null
+          consultation_date?: string | null
+          created_at?: string | null
+          diagnosis?: string | null
+          doctor_id?: string
+          id?: string
+          lab_results_reviewed?: boolean | null
+          lab_tests_ordered?: string[] | null
+          notes?: string | null
+          patient_id?: string
+          requires_lab_tests?: boolean | null
+          requires_prescription?: boolean | null
+          requires_surgery?: boolean | null
+          status?: string | null
+          surgery_referral_notes?: string | null
+          treatment_plan?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "doctor_consultations_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_consultations_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       doctor_schedules: {
         Row: {
           created_at: string

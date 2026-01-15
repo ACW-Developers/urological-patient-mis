@@ -6,13 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Users, Search, Edit, Shield } from 'lucide-react';
+import { Users, Search, Edit, Shield, UserX, Trash2, UserCheck } from 'lucide-react';
 import type { Profile, UserRole, AppRole } from '@/types/database';
 
 const roleLabels: Record<AppRole, { label: string; color: string }> = {
@@ -27,8 +28,11 @@ export default function UserManagement() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedUser, setSelectedUser] = useState<(Profile & { role?: UserRole }) | null>(null);
   const [newRole, setNewRole] = useState<string>('');
+  const [userToDeactivate, setUserToDeactivate] = useState<(Profile & { role?: UserRole }) | null>(null);
+  const [userToDelete, setUserToDelete] = useState<(Profile & { role?: UserRole }) | null>(null);
 
   const { data: users, isLoading } = useQuery({
     queryKey: ['users-with-roles'],
@@ -84,13 +88,53 @@ export default function UserManagement() {
     },
   });
 
+  const deactivateUserMutation = useMutation({
+    mutationFn: async ({ userId, isActive }: { userId: string; isActive: boolean }) => {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_active: isActive } as any)
+        .eq('user_id', userId);
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['users-with-roles'] });
+      toast.success(variables.isActive ? 'User account activated' : 'User account deactivated');
+      setUserToDeactivate(null);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async ({ userId }: { userId: string }) => {
+      // Delete user role first
+      await supabase.from('user_roles').delete().eq('user_id', userId);
+      
+      // Delete profile
+      const { error } = await supabase.from('profiles').delete().eq('user_id', userId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-with-roles'] });
+      toast.success('User account deleted');
+      setUserToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
   const filteredUsers = users?.filter((user) => {
     const matchesSearch =
       user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === 'all' || user.role?.role === roleFilter;
-    return matchesSearch && matchesRole;
+    const matchesStatus = statusFilter === 'all' || 
+      (statusFilter === 'active' && user.is_active !== false) ||
+      (statusFilter === 'inactive' && user.is_active === false);
+    return matchesSearch && matchesRole && matchesStatus;
   });
 
   const getRoleBadge = (role?: AppRole) => {
@@ -99,11 +143,18 @@ export default function UserManagement() {
     return <Badge className={config.color}>{config.label}</Badge>;
   };
 
+  const getStatusBadge = (isActive?: boolean) => {
+    if (isActive === false) {
+      return <Badge variant="destructive">Inactive</Badge>;
+    }
+    return <Badge variant="default">Active</Badge>;
+  };
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-display font-bold text-foreground">User Management</h1>
-        <p className="text-muted-foreground">Manage staff accounts and roles</p>
+        <p className="text-muted-foreground">Manage staff accounts, roles, and access</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -152,6 +203,16 @@ export default function UserManagement() {
                 <SelectItem value="pharmacist">Pharmacists</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent>
@@ -171,13 +232,14 @@ export default function UserManagement() {
                     <TableHead>Email</TableHead>
                     <TableHead>Department</TableHead>
                     <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredUsers?.map((user) => (
-                    <TableRow key={user.id}>
+                    <TableRow key={user.id} className={user.is_active === false ? 'opacity-60' : ''}>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar>
@@ -195,18 +257,57 @@ export default function UserManagement() {
                       <TableCell>{user.email}</TableCell>
                       <TableCell>{user.department || '-'}</TableCell>
                       <TableCell>{getRoleBadge(user.role?.role as AppRole)}</TableCell>
+                      <TableCell>{getStatusBadge(user.is_active)}</TableCell>
                       <TableCell>{format(new Date(user.created_at), 'MMM d, yyyy')}</TableCell>
                       <TableCell>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedUser(user);
-                            setNewRole(user.role?.role || '');
-                          }}
-                        >
-                          <Edit className="h-4 w-4 mr-1" /> Edit Role
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setNewRole(user.role?.role || '');
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setUserToDeactivate(user)}
+                          >
+                            {user.is_active === false ? (
+                              <UserCheck className="h-4 w-4 text-success" />
+                            ) : (
+                              <UserX className="h-4 w-4 text-warning" />
+                            )}
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="sm" variant="outline" className="text-destructive hover:text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete User Account</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to permanently delete the account for {user.first_name} {user.last_name}? 
+                                  This action cannot be undone and will remove all associated data.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  onClick={() => deleteUserMutation.mutate({ userId: user.user_id })}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -217,6 +318,7 @@ export default function UserManagement() {
         </CardContent>
       </Card>
 
+      {/* Edit Role Dialog */}
       <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
         <DialogContent>
           <DialogHeader>
@@ -264,6 +366,56 @@ export default function UserManagement() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Deactivate/Activate Dialog */}
+      <Dialog open={!!userToDeactivate} onOpenChange={() => setUserToDeactivate(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {userToDeactivate?.is_active === false ? 'Activate' : 'Deactivate'} User Account
+            </DialogTitle>
+            <DialogDescription>
+              {userToDeactivate?.is_active === false 
+                ? `This will restore access for ${userToDeactivate?.first_name} ${userToDeactivate?.last_name}.`
+                : `This will prevent ${userToDeactivate?.first_name} ${userToDeactivate?.last_name} from accessing the system. Their data will be preserved.`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          {userToDeactivate && (
+            <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg">
+              <Avatar>
+                <AvatarImage src={userToDeactivate.avatar_url || undefined} />
+                <AvatarFallback>
+                  {userToDeactivate.first_name[0]}{userToDeactivate.last_name[0]}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <div className="font-medium">{userToDeactivate.first_name} {userToDeactivate.last_name}</div>
+                <div className="text-sm text-muted-foreground">{userToDeactivate.email}</div>
+                <div className="mt-1">{getStatusBadge(userToDeactivate.is_active)}</div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUserToDeactivate(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant={userToDeactivate?.is_active === false ? 'default' : 'destructive'}
+              onClick={() => userToDeactivate && deactivateUserMutation.mutate({ 
+                userId: userToDeactivate.user_id, 
+                isActive: userToDeactivate.is_active === false 
+              })}
+              disabled={deactivateUserMutation.isPending}
+            >
+              {deactivateUserMutation.isPending 
+                ? 'Processing...' 
+                : userToDeactivate?.is_active === false ? 'Activate Account' : 'Deactivate Account'
+              }
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

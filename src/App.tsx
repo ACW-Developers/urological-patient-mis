@@ -30,6 +30,7 @@ import Reports from "./pages/Reports";
 import DoctorPatients from "./pages/DoctorPatients";
 import DoctorSchedule from "./pages/DoctorSchedule";
 import DoctorAppointments from "./pages/DoctorAppointments";
+import DoctorConsultation from "./pages/DoctorConsultation";
 import PatientDetail from "./pages/PatientDetail";
 import SurgeryWorkflow from "./pages/SurgeryWorkflow";
 import Profile from "./pages/Profile";
@@ -67,6 +68,9 @@ const App = () => (
                   } />
                   <Route path="/doctor/appointments" element={
                     <ProtectedRoute allowedRoles={['doctor']}><DoctorAppointments /></ProtectedRoute>
+                  } />
+                  <Route path="/doctor/consultation" element={
+                    <ProtectedRoute allowedRoles={['doctor', 'admin']}><DoctorConsultation /></ProtectedRoute>
                   } />
                   <Route path="/doctor/schedule" element={
                     <ProtectedRoute allowedRoles={['doctor']}><DoctorSchedule /></ProtectedRoute>
