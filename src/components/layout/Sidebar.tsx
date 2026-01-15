@@ -272,13 +272,9 @@ export function MobileSidebarTrigger() {
 }
 
 export function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+  const { collapsed, setCollapsed } = useSidebar();
 
-  return (
-    <SidebarContext.Provider value={{ collapsed, setCollapsed }}>
-      <DesktopSidebar collapsed={collapsed} setCollapsed={setCollapsed} />
-    </SidebarContext.Provider>
-  );
+  return <DesktopSidebar collapsed={collapsed} setCollapsed={setCollapsed} />;
 }
 
 export { SidebarContext };

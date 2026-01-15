@@ -87,7 +87,27 @@ export default function DoctorConsultationPage() {
       if (!user?.id) return [];
       let query = supabase
         .from('appointments')
-        .select('*, patient:patients(*)')
+        .select(`
+          *,
+          patient:patients(
+            id,
+            patient_number,
+            first_name,
+            last_name,
+            date_of_birth,
+            gender,
+            phone,
+            email,
+            blood_type,
+            allergies,
+            chronic_conditions,
+            current_medications,
+            previous_surgeries,
+            cardiovascular_history,
+            emergency_contact_name,
+            emergency_contact_phone
+          )
+        `)
         .eq('status', 'confirmed')
         .order('appointment_date', { ascending: false });
       
@@ -98,7 +118,7 @@ export default function DoctorConsultationPage() {
       
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+      return data || [];
     },
     enabled: !!user?.id,
   });
