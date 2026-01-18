@@ -8,15 +8,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Pill, Search, Check, Eye, Package } from 'lucide-react';
+import { Pill, Search, Check, Eye, Package, Trash2 } from 'lucide-react';
 import type { Prescription, PrescriptionItem, Patient } from '@/types/database';
 
 export default function Pharmacy() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const queryClient = useQueryClient();
+  const isAdmin = role === 'admin';
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPrescription, setSelectedPrescription] = useState<(Prescription & { patient: Patient }) | null>(null);
 
@@ -63,6 +65,31 @@ export default function Pharmacy() {
       queryClient.invalidateQueries({ queryKey: ['pending-prescriptions'] });
       toast.success('Prescription dispensed successfully');
       setSelectedPrescription(null);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (prescriptionId: string) => {
+      // First delete prescription items
+      const { error: itemsError } = await supabase
+        .from('prescription_items')
+        .delete()
+        .eq('prescription_id', prescriptionId);
+      if (itemsError) throw itemsError;
+      
+      // Then delete the prescription
+      const { error } = await supabase
+        .from('prescriptions')
+        .delete()
+        .eq('id', prescriptionId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-prescriptions'] });
+      toast.success('Prescription deleted successfully');
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -153,6 +180,32 @@ export default function Pharmacy() {
                             <Button size="sm" variant="outline" onClick={() => setSelectedPrescription(prescription)}>
                               <Eye className="h-4 w-4 mr-1" /> Review
                             </Button>
+                            {isAdmin && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:text-destructive">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete prescription?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This will permanently delete this prescription and all its items.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => deleteMutation.mutate(prescription.id)}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                      {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

@@ -17,7 +17,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Plus, Pill, Search, Eye, Trash2, Syringe, Stethoscope, CalendarIcon, AlertCircle, ArrowRight } from 'lucide-react';
+import { Plus, Pill, Search, Eye, Trash2, Syringe, Stethoscope, CalendarIcon, AlertCircle, ArrowRight, Edit } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import type { Prescription, PrescriptionItem, Patient } from '@/types/database';
 import { notifyPharmacists } from '@/lib/notifications';
 import { cn } from '@/lib/utils';
@@ -260,6 +261,33 @@ export default function Prescriptions() {
     },
   });
 
+  const deletePrescriptionMutation = useMutation({
+    mutationFn: async (prescriptionId: string) => {
+      // First delete prescription items
+      const { error: itemsError } = await supabase
+        .from('prescription_items')
+        .delete()
+        .eq('prescription_id', prescriptionId);
+      if (itemsError) throw itemsError;
+      
+      // Then delete the prescription
+      const { error } = await supabase
+        .from('prescriptions')
+        .delete()
+        .eq('id', prescriptionId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
+      toast.success('Prescription deleted successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const isAdmin = role === 'admin';
+
   const resetForm = () => {
     setSelectedPatient('');
     setNotes('');
@@ -434,16 +462,44 @@ export default function Prescriptions() {
                             {prescription.dispensed_at ? format(new Date(prescription.dispensed_at), 'MMM d, yyyy') : '-'}
                           </TableCell>
                           <TableCell>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedPrescription(prescription as Prescription & { patient: Patient; items: PrescriptionItem[] });
-                                setViewDialogOpen(true);
-                              }}
-                            >
-                              <Eye className="h-4 w-4 mr-1" /> View
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedPrescription(prescription as Prescription & { patient: Patient; items: PrescriptionItem[] });
+                                  setViewDialogOpen(true);
+                                }}
+                              >
+                                <Eye className="h-4 w-4 mr-1" /> View
+                              </Button>
+                              {isAdmin && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:text-destructive">
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete prescription?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This will permanently delete this prescription and all its items.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => deletePrescriptionMutation.mutate(prescription.id)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        {deletePrescriptionMutation.isPending ? 'Deleting...' : 'Delete'}
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}

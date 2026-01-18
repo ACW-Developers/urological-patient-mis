@@ -18,7 +18,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Plus, Syringe, Search, ClipboardCheck, Play, CheckCircle, FileEdit, CalendarIcon, Stethoscope } from 'lucide-react';
+import { Plus, Syringe, Search, ClipboardCheck, Play, CheckCircle, FileEdit, CalendarIcon, Stethoscope, Trash2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import type { Surgery, Patient } from '@/types/database';
 import { cn } from '@/lib/utils';
 
@@ -154,6 +155,25 @@ export default function Surgeries() {
       toast.error(error.message);
     },
   });
+
+  const deleteSurgeryMutation = useMutation({
+    mutationFn: async (surgeryId: string) => {
+      const { error } = await supabase
+        .from('surgeries')
+        .delete()
+        .eq('id', surgeryId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['surgeries'] });
+      toast.success('Surgery deleted successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const isAdmin = role === 'admin';
 
   const scheduleFromReferralMutation = useMutation({
     mutationFn: async (referral: ConsultationReferral) => {
@@ -395,6 +415,32 @@ export default function Surgeries() {
                                 <Button size="sm" variant="default" onClick={() => completeSurgery(surgery)}>
                                   <CheckCircle className="h-4 w-4 mr-1" /> Complete
                                 </Button>
+                              )}
+                              {isAdmin && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:text-destructive">
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete surgery?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This will permanently delete this surgery record from the database.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => deleteSurgeryMutation.mutate(surgery.id)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        {deleteSurgeryMutation.isPending ? 'Deleting...' : 'Delete'}
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
                               )}
                             </div>
                           </TableCell>
