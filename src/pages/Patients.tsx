@@ -8,16 +8,25 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Users, Search, Plus, Eye, Activity, Calendar, FileText } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Users, Search, Plus, Eye, Activity, Calendar, FileText, Edit, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 export default function Patients() {
   const navigate = useNavigate();
   const { role } = useAuth();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [editPatient, setEditPatient] = useState<Patient | null>(null);
+  const [deletePatient, setDeletePatient] = useState<Patient | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Patient>>({});
 
   const { data: patients, isLoading } = useQuery({
     queryKey: ['patients', search],
@@ -36,6 +45,74 @@ export default function Patients() {
       return data as Patient[];
     },
   });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: { id: string; updates: Partial<Patient> }) => {
+      const { error } = await supabase
+        .from('patients')
+        .update(data.updates)
+        .eq('id', data.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['patients'] });
+      toast.success('Patient updated successfully');
+      setEditPatient(null);
+    },
+    onError: (error) => {
+      toast.error('Failed to update patient: ' + error.message);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('patients')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['patients'] });
+      toast.success('Patient deleted successfully');
+      setDeletePatient(null);
+    },
+    onError: (error) => {
+      toast.error('Failed to delete patient: ' + error.message);
+    },
+  });
+
+  const handleEditClick = (patient: Patient) => {
+    setEditPatient(patient);
+    setEditForm({
+      first_name: patient.first_name,
+      last_name: patient.last_name,
+      phone: patient.phone,
+      email: patient.email,
+      address: patient.address,
+      city: patient.city,
+      blood_type: patient.blood_type,
+      status: patient.status,
+      allergies: patient.allergies,
+      chronic_conditions: patient.chronic_conditions,
+      cardiovascular_history: patient.cardiovascular_history,
+      current_medications: patient.current_medications,
+      previous_surgeries: patient.previous_surgeries,
+      emergency_contact_name: patient.emergency_contact_name,
+      emergency_contact_phone: patient.emergency_contact_phone,
+      emergency_contact_relationship: patient.emergency_contact_relationship,
+    });
+  };
+
+  const handleSaveEdit = () => {
+    if (!editPatient) return;
+    updateMutation.mutate({ id: editPatient.id, updates: editForm });
+  };
+
+  const handleDeleteConfirm = () => {
+    if (!deletePatient) return;
+    deleteMutation.mutate(deletePatient.id);
+  };
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, string> = {
@@ -137,11 +214,12 @@ export default function Patients() {
                       </TableCell>
                       <TableCell>{getStatusBadge(patient.status)}</TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => setSelectedPatient(patient)}
+                            title="View Details"
                           >
                             <Eye className="w-4 h-4" />
                           </Button>
@@ -150,6 +228,7 @@ export default function Patients() {
                               variant="ghost"
                               size="icon"
                               onClick={() => navigate(`/vitals?patient=${patient.id}`)}
+                              title="Record Vitals"
                             >
                               <Activity className="w-4 h-4" />
                             </Button>
@@ -159,9 +238,30 @@ export default function Patients() {
                               variant="ghost"
                               size="icon"
                               onClick={() => navigate(`/appointments?patient=${patient.id}`)}
+                              title="Appointments"
                             >
                               <Calendar className="w-4 h-4" />
                             </Button>
+                          )}
+                          {role === 'admin' && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEditClick(patient)}
+                                title="Edit Patient"
+                              >
+                                <Edit className="w-4 h-4 text-primary" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setDeletePatient(patient)}
+                                title="Delete Patient"
+                              >
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            </>
                           )}
                         </div>
                       </TableCell>
@@ -256,6 +356,242 @@ export default function Patients() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Patient Dialog */}
+      <Dialog open={!!editPatient} onOpenChange={() => setEditPatient(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="w-5 h-5 text-primary" />
+              Edit Patient: {editPatient?.first_name} {editPatient?.last_name}
+            </DialogTitle>
+          </DialogHeader>
+          {editPatient && (
+            <div className="space-y-6">
+              {/* Personal Information */}
+              <div>
+                <h3 className="font-semibold mb-3">Personal Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="first_name">First Name</Label>
+                    <Input
+                      id="first_name"
+                      value={editForm.first_name || ''}
+                      onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="last_name">Last Name</Label>
+                    <Input
+                      id="last_name"
+                      value={editForm.last_name || ''}
+                      onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input
+                      id="phone"
+                      value={editForm.phone || ''}
+                      onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={editForm.email || ''}
+                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="blood_type">Blood Type</Label>
+                    <Select
+                      value={editForm.blood_type || ''}
+                      onValueChange={(value) => setEditForm({ ...editForm, blood_type: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select blood type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((type) => (
+                          <SelectItem key={type} value={type}>{type}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Status</Label>
+                    <Select
+                      value={editForm.status || 'active'}
+                      onValueChange={(value) => setEditForm({ ...editForm, status: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                        <SelectItem value="discharged">Discharged</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Address */}
+              <div>
+                <h3 className="font-semibold mb-3">Address</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Address</Label>
+                    <Input
+                      id="address"
+                      value={editForm.address || ''}
+                      onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City</Label>
+                    <Input
+                      id="city"
+                      value={editForm.city || ''}
+                      onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Emergency Contact */}
+              <div>
+                <h3 className="font-semibold mb-3">Emergency Contact</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="emergency_name">Name</Label>
+                    <Input
+                      id="emergency_name"
+                      value={editForm.emergency_contact_name || ''}
+                      onChange={(e) => setEditForm({ ...editForm, emergency_contact_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="emergency_phone">Phone</Label>
+                    <Input
+                      id="emergency_phone"
+                      value={editForm.emergency_contact_phone || ''}
+                      onChange={(e) => setEditForm({ ...editForm, emergency_contact_phone: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="emergency_relationship">Relationship</Label>
+                    <Input
+                      id="emergency_relationship"
+                      value={editForm.emergency_contact_relationship || ''}
+                      onChange={(e) => setEditForm({ ...editForm, emergency_contact_relationship: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Medical History */}
+              <div>
+                <h3 className="font-semibold mb-3">Medical History</h3>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="allergies">Allergies (comma-separated)</Label>
+                    <Input
+                      id="allergies"
+                      value={editForm.allergies?.join(', ') || ''}
+                      onChange={(e) => setEditForm({ 
+                        ...editForm, 
+                        allergies: e.target.value.split(',').map(s => s.trim()).filter(Boolean) 
+                      })}
+                      placeholder="e.g., Penicillin, Aspirin"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="chronic_conditions">Chronic Conditions (comma-separated)</Label>
+                    <Input
+                      id="chronic_conditions"
+                      value={editForm.chronic_conditions?.join(', ') || ''}
+                      onChange={(e) => setEditForm({ 
+                        ...editForm, 
+                        chronic_conditions: e.target.value.split(',').map(s => s.trim()).filter(Boolean) 
+                      })}
+                      placeholder="e.g., Hypertension, Diabetes"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cardiovascular_history">Cardiovascular History</Label>
+                    <Textarea
+                      id="cardiovascular_history"
+                      value={editForm.cardiovascular_history || ''}
+                      onChange={(e) => setEditForm({ ...editForm, cardiovascular_history: e.target.value })}
+                      rows={3}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="current_medications">Current Medications</Label>
+                    <Textarea
+                      id="current_medications"
+                      value={editForm.current_medications || ''}
+                      onChange={(e) => setEditForm({ ...editForm, current_medications: e.target.value })}
+                      rows={2}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="previous_surgeries">Previous Surgeries</Label>
+                    <Textarea
+                      id="previous_surgeries"
+                      value={editForm.previous_surgeries || ''}
+                      onChange={(e) => setEditForm({ ...editForm, previous_surgeries: e.target.value })}
+                      rows={2}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditPatient(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletePatient} onOpenChange={() => setDeletePatient(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Patient Record</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the patient record for{' '}
+              <span className="font-semibold">
+                {deletePatient?.first_name} {deletePatient?.last_name}
+              </span>{' '}
+              ({deletePatient?.patient_number})?
+              <br /><br />
+              <span className="text-destructive font-medium">
+                This action cannot be undone. All associated records (vitals, appointments, lab tests) will also be deleted.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete Patient'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
