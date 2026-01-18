@@ -21,10 +21,12 @@ import { format, differenceInYears } from 'date-fns';
 import { 
   Stethoscope, Search, ClipboardList, FlaskConical, 
   FileText, Activity, Pill, Syringe, AlertTriangle,
-  CheckCircle, Clock, User, Calendar, TrendingUp
+  CheckCircle, Clock, User, Calendar, TrendingUp, 
+  Phone, Mail, Heart, Plus, ArrowRight, X
 } from 'lucide-react';
 import { VitalsTrendChart } from '@/components/charts/VitalsTrendChart';
-import type { Patient, Appointment, Vitals, LabTest, LabResult } from '@/types/database';
+import type { Patient, Vitals, LabTest, LabResult } from '@/types/database';
+import { notifyLabTechnicians } from '@/lib/notifications';
 
 const labTestTypes = [
   { type: 'Blood Panel', tests: ['Complete Blood Count (CBC)', 'Lipid Panel', 'Basic Metabolic Panel', 'Comprehensive Metabolic Panel'] },
@@ -60,301 +62,225 @@ export default function DoctorConsultationPage() {
   const { user, role } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
-  const [consultationDialogOpen, setConsultationDialogOpen] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [activeTab, setActiveTab] = useState('details');
   const [labOrderDialogOpen, setLabOrderDialogOpen] = useState(false);
   const [decisionDialogOpen, setDecisionDialogOpen] = useState(false);
+  const [surgeryDialogOpen, setSurgeryDialogOpen] = useState(false);
 
-  // Form state for consultation
-  const [formData, setFormData] = useState({
+  // Lab order form state
+  const [selectedTestType, setSelectedTestType] = useState('');
+  const [selectedTests, setSelectedTests] = useState<string[]>([]);
+  const [labPriority, setLabPriority] = useState('routine');
+  const [labNotes, setLabNotes] = useState('');
+
+  // Analysis form state
+  const [analysisForm, setAnalysisForm] = useState({
     chiefComplaint: '',
     clinicalFindings: '',
     diagnosis: '',
     treatmentPlan: '',
     notes: '',
-    requiresLabTests: false,
-    selectedLabTests: [] as string[],
   });
 
-  // Decision state (after lab results)
-  const [decision, setDecision] = useState<'prescription' | 'surgery' | ''>('');
-  const [surgeryNotes, setSurgeryNotes] = useState('');
-
-  // Fetch confirmed appointments (accepted by doctor) that need consultation
-  const { data: appointments, isLoading } = useQuery({
-    queryKey: ['doctor-consultation-appointments', user?.id, role],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      let query = supabase
-        .from('appointments')
-        .select(`
-          *,
-          patient:patients(
-            id,
-            patient_number,
-            first_name,
-            last_name,
-            date_of_birth,
-            gender,
-            phone,
-            email,
-            blood_type,
-            allergies,
-            chronic_conditions,
-            current_medications,
-            previous_surgeries,
-            cardiovascular_history,
-            emergency_contact_name,
-            emergency_contact_phone
-          )
-        `)
-        .eq('status', 'confirmed')
-        .order('appointment_date', { ascending: false });
-      
-      // Admin can see all confirmed appointments, doctors only see their own
-      if (role !== 'admin') {
-        query = query.eq('doctor_id', user.id);
-      }
-      
-      const { data, error } = await query;
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!user?.id,
+  // Surgery referral state
+  const [surgeryForm, setSurgeryForm] = useState({
+    surgeryName: '',
+    surgeryType: '',
+    reason: '',
+    notes: '',
   });
 
-  // Fetch existing consultations
-  const { data: consultations } = useQuery({
-    queryKey: ['doctor-consultations', user?.id, role],
+  // Fetch all patients
+  const { data: patients, isLoading: patientsLoading } = useQuery({
+    queryKey: ['all-patients'],
     queryFn: async () => {
-      if (!user?.id) return [];
-      let query = supabase
-        .from('doctor_consultations')
+      const { data, error } = await supabase
+        .from('patients')
         .select('*')
         .order('created_at', { ascending: false });
-      
-      // Admin can see all consultations, doctors only see their own
-      if (role !== 'admin') {
-        query = query.eq('doctor_id', user.id);
-      }
-      
-      const { data, error } = await query;
       if (error) throw error;
-      return data as DoctorConsultation[];
+      return data as Patient[];
     },
-    enabled: !!user?.id,
   });
 
-  // Fetch ALL patient vitals for selected appointment (no limit for trend charts)
-  const { data: patientVitals } = useQuery({
-    queryKey: ['patient-vitals', selectedAppointment?.patient_id],
+  // Fetch patient vitals when selected
+  const { data: patientVitals, isLoading: vitalsLoading } = useQuery({
+    queryKey: ['patient-vitals', selectedPatient?.id],
     queryFn: async () => {
-      if (!selectedAppointment?.patient_id) return [];
+      if (!selectedPatient?.id) return [];
       const { data, error } = await supabase
         .from('vitals')
         .select('*')
-        .eq('patient_id', selectedAppointment.patient_id)
+        .eq('patient_id', selectedPatient.id)
         .order('recorded_at', { ascending: false });
       if (error) throw error;
       return data as Vitals[];
     },
-    enabled: !!selectedAppointment?.patient_id,
+    enabled: !!selectedPatient?.id,
   });
 
-  // Fetch ALL patient lab tests and results (no limit)
-  const { data: patientLabTests } = useQuery({
-    queryKey: ['patient-lab-tests', selectedAppointment?.patient_id],
+  // Fetch patient lab tests when selected
+  const { data: patientLabTests, isLoading: labsLoading } = useQuery({
+    queryKey: ['patient-lab-tests', selectedPatient?.id],
     queryFn: async () => {
-      if (!selectedAppointment?.patient_id) return [];
+      if (!selectedPatient?.id) return [];
       const { data, error } = await supabase
         .from('lab_tests')
         .select('*, lab_results(*)')
-        .eq('patient_id', selectedAppointment.patient_id)
+        .eq('patient_id', selectedPatient.id)
         .order('ordered_at', { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedAppointment?.patient_id,
+    enabled: !!selectedPatient?.id,
   });
 
-  // Get consultation for selected appointment
-  const selectedConsultation = consultations?.find(
-    c => c.appointment_id === selectedAppointment?.id
-  );
+  // Fetch patient prescriptions
+  const { data: patientPrescriptions } = useQuery({
+    queryKey: ['patient-prescriptions', selectedPatient?.id],
+    queryFn: async () => {
+      if (!selectedPatient?.id) return [];
+      const { data, error } = await supabase
+        .from('prescriptions')
+        .select('*, prescription_items(*)')
+        .eq('patient_id', selectedPatient.id)
+        .order('prescribed_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedPatient?.id,
+  });
 
-  // Create/Update consultation mutation
-  const consultationMutation = useMutation({
-    mutationFn: async (data: { appointmentId: string; patientId: string }) => {
-      const consultationData = {
-        appointment_id: data.appointmentId,
-        patient_id: data.patientId,
-        doctor_id: user?.id,
-        chief_complaint: formData.chiefComplaint,
-        clinical_findings: formData.clinicalFindings,
-        diagnosis: formData.diagnosis || null,
-        treatment_plan: formData.treatmentPlan || null,
-        requires_lab_tests: formData.requiresLabTests,
-        lab_tests_ordered: formData.selectedLabTests.length > 0 ? formData.selectedLabTests : null,
-        status: formData.requiresLabTests ? 'awaiting_lab_results' : 'pending',
-        notes: formData.notes || null,
-      };
+  // Fetch patient surgeries
+  const { data: patientSurgeries } = useQuery({
+    queryKey: ['patient-surgeries', selectedPatient?.id],
+    queryFn: async () => {
+      if (!selectedPatient?.id) return [];
+      const { data, error } = await supabase
+        .from('surgeries')
+        .select('*')
+        .eq('patient_id', selectedPatient.id)
+        .order('scheduled_date', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedPatient?.id,
+  });
 
-      if (selectedConsultation) {
-        const { error } = await supabase
-          .from('doctor_consultations')
-          .update(consultationData)
-          .eq('id', selectedConsultation.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('doctor_consultations')
-          .insert(consultationData);
-        if (error) throw error;
+  // Fetch patient appointments
+  const { data: patientAppointments } = useQuery({
+    queryKey: ['patient-appointments', selectedPatient?.id],
+    queryFn: async () => {
+      if (!selectedPatient?.id) return [];
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('patient_id', selectedPatient.id)
+        .order('appointment_date', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedPatient?.id,
+  });
+
+  // Lab order mutation
+  const orderLabMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedPatient || selectedTests.length === 0) {
+        throw new Error('Please select tests to order');
       }
 
-      // If lab tests are required, create lab orders
-      if (formData.requiresLabTests && formData.selectedLabTests.length > 0) {
-        for (const testName of formData.selectedLabTests) {
-          const testType = labTestTypes.find(t => t.tests.includes(testName))?.type || 'Other';
-          await supabase.from('lab_tests').insert({
-            patient_id: data.patientId,
+      for (const testName of selectedTests) {
+        const testType = labTestTypes.find(t => t.tests.includes(testName))?.type || 'Other';
+        
+        const { data: newTest, error } = await supabase
+          .from('lab_tests')
+          .insert({
+            patient_id: selectedPatient.id,
             ordered_by: user?.id,
             test_type: testType,
             test_name: testName,
-            priority: 'routine',
-          });
-        }
+            priority: labPriority,
+            notes: labNotes,
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+
+        // Notify lab technicians
+        await notifyLabTechnicians(
+          newTest.id,
+          `${selectedPatient.first_name} ${selectedPatient.last_name}`,
+          testName,
+          labPriority
+        );
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['doctor-consultations'] });
-      queryClient.invalidateQueries({ queryKey: ['patient-lab-tests'] });
-      toast.success(formData.requiresLabTests ? 'Consultation saved & lab tests ordered' : 'Consultation saved');
-      setConsultationDialogOpen(false);
-      resetForm();
+      queryClient.invalidateQueries({ queryKey: ['patient-lab-tests', selectedPatient?.id] });
+      toast.success(`${selectedTests.length} lab test(s) ordered successfully`);
+      setLabOrderDialogOpen(false);
+      resetLabForm();
     },
     onError: (error: Error) => {
       toast.error(error.message);
     },
   });
 
-  // Complete consultation with decision
-  const completeConsultationMutation = useMutation({
+  // Surgery referral mutation
+  const createSurgeryMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedConsultation) throw new Error('No consultation selected');
+      if (!selectedPatient) throw new Error('No patient selected');
 
-      const updates: Partial<DoctorConsultation> = {
-        lab_results_reviewed: true,
-        diagnosis: formData.diagnosis,
-        treatment_plan: formData.treatmentPlan,
-        status: decision === 'surgery' ? 'referred_to_surgery' : 'referred_to_prescription',
-        requires_surgery: decision === 'surgery',
-        requires_prescription: decision === 'prescription',
-        surgery_referral_notes: decision === 'surgery' ? surgeryNotes : null,
-      };
-
-      const { error } = await supabase
-        .from('doctor_consultations')
-        .update(updates)
-        .eq('id', selectedConsultation.id);
+      const { error } = await supabase.from('surgeries').insert({
+        patient_id: selectedPatient.id,
+        surgeon_id: user?.id,
+        surgery_name: surgeryForm.surgeryName,
+        surgery_type: surgeryForm.surgeryType,
+        scheduled_date: format(new Date(), 'yyyy-MM-dd'),
+        scheduled_time: '09:00',
+        pre_op_assessment: surgeryForm.reason,
+        status: 'scheduled',
+      });
       if (error) throw error;
-
-      // If surgery is selected, create a surgery referral
-      if (decision === 'surgery') {
-        // Navigate to prescriptions with surgery flag
-        navigate(`/prescriptions?consultation=${selectedConsultation.id}&action=surgery`);
-      } else {
-        // Navigate to prescriptions
-        navigate(`/prescriptions?consultation=${selectedConsultation.id}&action=prescription`);
-      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['doctor-consultations'] });
-      toast.success('Consultation completed');
-      setDecisionDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['patient-surgeries', selectedPatient?.id] });
+      toast.success('Surgery scheduled successfully');
+      setSurgeryDialogOpen(false);
+      navigate('/surgeries');
     },
     onError: (error: Error) => {
       toast.error(error.message);
     },
   });
 
-  const resetForm = () => {
-    setFormData({
-      chiefComplaint: '',
-      clinicalFindings: '',
-      diagnosis: '',
-      treatmentPlan: '',
-      notes: '',
-      requiresLabTests: false,
-      selectedLabTests: [],
-    });
-    setDecision('');
-    setSurgeryNotes('');
+  const resetLabForm = () => {
+    setSelectedTestType('');
+    setSelectedTests([]);
+    setLabPriority('routine');
+    setLabNotes('');
   };
 
-  const openConsultation = (appointment: any) => {
-    setSelectedAppointment(appointment);
-    const existing = consultations?.find(c => c.appointment_id === appointment.id);
-    if (existing) {
-      setFormData({
-        chiefComplaint: existing.chief_complaint || '',
-        clinicalFindings: existing.clinical_findings || '',
-        diagnosis: existing.diagnosis || '',
-        treatmentPlan: existing.treatment_plan || '',
-        notes: existing.notes || '',
-        requiresLabTests: existing.requires_lab_tests,
-        selectedLabTests: existing.lab_tests_ordered || [],
-      });
-    } else {
-      resetForm();
-    }
-    setConsultationDialogOpen(true);
-  };
-
-  const getStatusBadge = (status: string) => {
-    const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string; icon: React.ElementType }> = {
-      pending: { variant: 'outline', label: 'Pending', icon: Clock },
-      awaiting_lab_results: { variant: 'secondary', label: 'Awaiting Labs', icon: FlaskConical },
-      lab_results_reviewed: { variant: 'secondary', label: 'Labs Reviewed', icon: CheckCircle },
-      referred_to_surgery: { variant: 'destructive', label: 'Surgery Referral', icon: Syringe },
-      referred_to_prescription: { variant: 'default', label: 'Prescription', icon: Pill },
-      completed: { variant: 'default', label: 'Completed', icon: CheckCircle },
-    };
-    const c = config[status] || { variant: 'outline', label: status, icon: Clock };
-    const Icon = c.icon;
+  const filteredPatients = patients?.filter((patient) => {
+    const searchLower = searchTerm.toLowerCase();
     return (
-      <Badge variant={c.variant} className="gap-1">
-        <Icon className="h-3 w-3" />
-        {c.label}
-      </Badge>
+      patient.first_name.toLowerCase().includes(searchLower) ||
+      patient.last_name.toLowerCase().includes(searchLower) ||
+      patient.patient_number.toLowerCase().includes(searchLower) ||
+      patient.phone?.toLowerCase().includes(searchLower)
     );
-  };
-
-  const filteredAppointments = appointments?.filter((apt) => {
-    const matchesSearch =
-      apt.patient?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      apt.patient?.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      apt.patient?.patient_number?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const consultation = consultations?.find(c => c.appointment_id === apt.id);
-    const consultationStatus = consultation?.status || 'no_consultation';
-    const matchesStatus = statusFilter === 'all' || consultationStatus === statusFilter;
-    
-    return matchesSearch && matchesStatus;
   });
 
-  const canProceedToDecision = (consultation: DoctorConsultation | undefined) => {
-    if (!consultation) return false;
-    if (!consultation.requires_lab_tests) return true;
-    
-    // Check if all ordered lab tests have results
-    const orderedTests = consultation.lab_tests_ordered || [];
-    const completedTests = patientLabTests?.filter(t => 
-      orderedTests.includes(t.test_name) && t.status === 'completed'
-    ) || [];
-    
-    return completedTests.length >= orderedTests.length;
+  const getPatientAge = (dob: string) => {
+    return differenceInYears(new Date(), new Date(dob));
+  };
+
+  const handlePrescriptionClick = () => {
+    if (!selectedPatient) return;
+    navigate(`/prescriptions?patient=${selectedPatient.id}`);
   };
 
   if (role !== 'doctor' && role !== 'admin') {
@@ -375,510 +301,699 @@ export default function DoctorConsultationPage() {
         <p className="text-muted-foreground">Analyze patient records, order lab tests, and make treatment decisions</p>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Patient List */}
+        <Card className="lg:col-span-1">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Patients</CardTitle>
+            <div className="relative mt-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by patient name or number..."
+                placeholder="Search patients..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="no_consultation">No Consultation</SelectItem>
-                <SelectItem value="pending">Pending Analysis</SelectItem>
-                <SelectItem value="awaiting_lab_results">Awaiting Labs</SelectItem>
-                <SelectItem value="lab_results_reviewed">Labs Reviewed</SelectItem>
-                <SelectItem value="referred_to_surgery">Surgery Referral</SelectItem>
-                <SelectItem value="referred_to_prescription">Prescription</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading appointments...</div>
-          ) : filteredAppointments?.length === 0 ? (
-            <div className="text-center py-8">
-              <Stethoscope className="mx-auto h-12 w-12 text-muted-foreground/50" />
-              <p className="mt-2 text-muted-foreground">No appointments found</p>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ScrollArea className="h-[calc(100vh-320px)]">
+              {patientsLoading ? (
+                <div className="p-4 text-center text-muted-foreground">Loading...</div>
+              ) : filteredPatients?.length === 0 ? (
+                <div className="p-4 text-center text-muted-foreground">No patients found</div>
+              ) : (
+                <div className="divide-y">
+                  {filteredPatients?.map((patient) => (
+                    <div
+                      key={patient.id}
+                      className={`p-3 cursor-pointer hover:bg-muted/50 transition-colors ${
+                        selectedPatient?.id === patient.id ? 'bg-primary/10 border-l-2 border-primary' : ''
+                      }`}
+                      onClick={() => setSelectedPatient(patient)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <User className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">
+                            {patient.first_name} {patient.last_name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{patient.patient_number}</p>
+                        </div>
+                        <div className="text-right text-xs text-muted-foreground">
+                          <p>{getPatientAge(patient.date_of_birth)} yrs</p>
+                          <p className="capitalize">{patient.gender}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+
+        {/* Patient Details Panel */}
+        <Card className="lg:col-span-2">
+          {!selectedPatient ? (
+            <div className="flex flex-col items-center justify-center h-[calc(100vh-280px)] text-muted-foreground">
+              <Stethoscope className="h-16 w-16 mb-4 opacity-30" />
+              <p>Select a patient to view their records</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Patient</TableHead>
-                  <TableHead>Appointment Date</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Consultation Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredAppointments?.map((apt) => {
-                  const consultation = consultations?.find(c => c.appointment_id === apt.id);
-                  return (
-                    <TableRow key={apt.id}>
-                      <TableCell>
-                        <div className="font-medium">
-                          {apt.patient?.first_name} {apt.patient?.last_name}
-                        </div>
-                        <div className="text-xs text-muted-foreground">{apt.patient?.patient_number}</div>
-                      </TableCell>
-                      <TableCell>
-                        {format(new Date(apt.appointment_date), 'MMM d, yyyy')}
-                        <div className="text-xs text-muted-foreground">{apt.appointment_time}</div>
-                      </TableCell>
-                      <TableCell className="capitalize">{apt.type}</TableCell>
-                      <TableCell>
-                        {consultation ? getStatusBadge(consultation.status) : (
-                          <Badge variant="outline">No Consultation</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => openConsultation(apt)}>
-                            <ClipboardList className="h-4 w-4 mr-1" />
-                            {consultation ? 'Continue' : 'Start'}
-                          </Button>
-                          {consultation && canProceedToDecision(consultation) && 
-                           !['referred_to_surgery', 'referred_to_prescription', 'completed'].includes(consultation.status) && (
-                            <Button 
-                              size="sm" 
-                              onClick={() => {
-                                setSelectedAppointment(apt);
-                                setFormData(prev => ({
-                                  ...prev,
-                                  diagnosis: consultation.diagnosis || '',
-                                  treatmentPlan: consultation.treatment_plan || '',
-                                }));
-                                setDecisionDialogOpen(true);
-                              }}
-                            >
-                              <FileText className="h-4 w-4 mr-1" />
-                              Decision
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Consultation Dialog */}
-      <Dialog open={consultationDialogOpen} onOpenChange={setConsultationDialogOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Patient Consultation - {selectedAppointment?.patient?.first_name} {selectedAppointment?.patient?.last_name}
-            </DialogTitle>
-          </DialogHeader>
-
-          {/* Patient Summary Panel - Always Visible */}
-          {selectedAppointment?.patient && (
-            <div className="bg-muted/50 rounded-lg p-4 border space-y-3">
-              <div className="flex flex-wrap items-center gap-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">Patient #:</span>
-                  <span className="font-medium">{selectedAppointment.patient.patient_number}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">Age:</span>
-                  <span className="font-medium">{differenceInYears(new Date(), new Date(selectedAppointment.patient.date_of_birth))} yrs</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">Gender:</span>
-                  <span className="font-medium capitalize">{selectedAppointment.patient.gender}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">Blood Type:</span>
-                  <span className="font-medium">{selectedAppointment.patient.blood_type || 'Unknown'}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">Emergency:</span>
-                  <span className="font-medium">{selectedAppointment.patient.emergency_contact_name || 'N/A'} ({selectedAppointment.patient.emergency_contact_phone || 'N/A'})</span>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {/* Allergies - Critical */}
-                <div className="bg-destructive/10 rounded-md p-2 border border-destructive/20">
-                  <div className="flex items-center gap-2 mb-1">
-                    <AlertTriangle className="h-4 w-4 text-destructive" />
-                    <span className="text-xs font-semibold text-destructive">ALLERGIES</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedAppointment.patient.allergies?.length > 0 ? 
-                      selectedAppointment.patient.allergies.map((a: string, i: number) => (
-                        <Badge key={i} variant="destructive" className="text-xs">{a}</Badge>
-                      )) : <span className="text-xs text-muted-foreground">None reported</span>
-                    }
-                  </div>
-                </div>
-
-                {/* Chronic Conditions */}
-                <div className="bg-warning/10 rounded-md p-2 border border-warning/20">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Activity className="h-4 w-4 text-warning" />
-                    <span className="text-xs font-semibold text-warning">CHRONIC CONDITIONS</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedAppointment.patient.chronic_conditions?.length > 0 ? 
-                      selectedAppointment.patient.chronic_conditions.map((c: string, i: number) => (
-                        <Badge key={i} variant="secondary" className="text-xs">{c}</Badge>
-                      )) : <span className="text-xs text-muted-foreground">None reported</span>
-                    }
-                  </div>
-                </div>
-              </div>
-
-              {/* Current Medications & Medical History Summary */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                <div>
-                  <span className="text-muted-foreground font-medium">Current Medications:</span>
-                  <p className="mt-0.5">{selectedAppointment.patient.current_medications || 'None reported'}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground font-medium">Cardiovascular History:</span>
-                  <p className="mt-0.5">{selectedAppointment.patient.cardiovascular_history || 'None reported'}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground font-medium">Previous Surgeries:</span>
-                  <p className="mt-0.5">{selectedAppointment.patient.previous_surgeries || 'None reported'}</p>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          <Tabs defaultValue="vitals" className="flex-1 overflow-hidden">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="vitals">Vitals History</TabsTrigger>
-              <TabsTrigger value="labs">Lab Results</TabsTrigger>
-              <TabsTrigger value="analysis">Analysis</TabsTrigger>
-            </TabsList>
-
-            <ScrollArea className="flex-1 mt-4 h-[350px]">
-              <TabsContent value="vitals" className="space-y-4 pr-4">
-                {patientVitals?.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Activity className="mx-auto h-12 w-12 mb-2 opacity-50" />
-                    No vitals recorded for this patient
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {/* Trend Charts */}
-                    <div>
-                      <h4 className="text-sm font-medium flex items-center gap-2 mb-3">
-                        <TrendingUp className="h-4 w-4" />
-                        Vital Signs Trends
-                      </h4>
-                      <VitalsTrendChart vitals={patientVitals || []} />
+            <>
+              {/* Patient Header */}
+              <CardHeader className="border-b pb-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="h-7 w-7 text-primary" />
                     </div>
-                    
-                    {/* Vitals Table */}
                     <div>
-                      <h4 className="text-sm font-medium mb-3">Recent Readings</h4>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Date</TableHead>
-                            <TableHead>BP</TableHead>
-                            <TableHead>HR</TableHead>
-                            <TableHead>SpO2</TableHead>
-                            <TableHead>Temp</TableHead>
-                            <TableHead>Notes</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {patientVitals?.slice(0, 10).map((v) => (
-                            <TableRow key={v.id}>
-                              <TableCell>{format(new Date(v.recorded_at), 'MMM d, yyyy HH:mm')}</TableCell>
-                              <TableCell>
-                                <span className={v.systolic_bp > 140 || v.diastolic_bp > 90 ? 'text-destructive font-medium' : ''}>
-                                  {v.systolic_bp}/{v.diastolic_bp}
-                                </span>
-                              </TableCell>
-                              <TableCell>
-                                <span className={v.heart_rate > 100 || v.heart_rate < 60 ? 'text-warning font-medium' : ''}>
-                                  {v.heart_rate}
-                                </span>
-                              </TableCell>
-                              <TableCell>
-                                <span className={v.oxygen_saturation && v.oxygen_saturation < 95 ? 'text-destructive font-medium' : ''}>
-                                  {v.oxygen_saturation || '-'}%
-                                </span>
-                              </TableCell>
-                              <TableCell>{v.temperature || '-'}°C</TableCell>
-                              <TableCell className="max-w-[200px] truncate">{v.notes || '-'}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="labs" className="space-y-4 pr-4">
-                {patientLabTests?.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <FlaskConical className="mx-auto h-12 w-12 mb-2 opacity-50" />
-                    No lab tests ordered for this patient
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {patientLabTests?.map((test: any) => (
-                      <Card key={test.id}>
-                        <CardHeader className="pb-2">
-                          <div className="flex items-center justify-between">
-                            <CardTitle className="text-sm">{test.test_name}</CardTitle>
-                            <Badge variant={test.status === 'completed' ? 'default' : 'outline'}>
-                              {test.status}
+                      <CardTitle className="text-xl">
+                        {selectedPatient.first_name} {selectedPatient.last_name}
+                      </CardTitle>
+                      <CardDescription className="flex items-center gap-3 mt-1">
+                        <span>{selectedPatient.patient_number}</span>
+                        <span>•</span>
+                        <span>{getPatientAge(selectedPatient.date_of_birth)} years</span>
+                        <span>•</span>
+                        <span className="capitalize">{selectedPatient.gender}</span>
+                        {selectedPatient.blood_type && (
+                          <>
+                            <span>•</span>
+                            <Badge variant="outline" className="gap-1">
+                              <Heart className="h-3 w-3" />
+                              {selectedPatient.blood_type}
                             </Badge>
-                          </div>
-                          <CardDescription className="text-xs">
-                            Ordered: {format(new Date(test.ordered_at), 'MMM d, yyyy')} | Type: {test.test_type}
-                          </CardDescription>
-                        </CardHeader>
-                        {test.lab_results?.length > 0 && (
-                          <CardContent>
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Parameter</TableHead>
-                                  <TableHead>Value</TableHead>
-                                  <TableHead>Reference</TableHead>
-                                  <TableHead>Status</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {test.lab_results.map((result: LabResult) => (
-                                  <TableRow key={result.id}>
-                                    <TableCell>{result.parameter_name}</TableCell>
-                                    <TableCell className={result.is_abnormal ? 'text-destructive font-medium' : ''}>
-                                      {result.value} {result.unit}
-                                    </TableCell>
-                                    <TableCell className="text-muted-foreground">{result.reference_range || '-'}</TableCell>
-                                    <TableCell>
-                                      {result.is_abnormal ? (
-                                        <Badge variant="destructive">Abnormal</Badge>
-                                      ) : (
-                                        <Badge variant="outline">Normal</Badge>
-                                      )}
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </CardContent>
+                          </>
                         )}
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={() => setSelectedPatient(null)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Quick Contact & Alerts */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <span>{selectedPatient.phone}</span>
+                    </div>
+                    {selectedPatient.email && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <span>{selectedPatient.email}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 justify-end">
+                    {selectedPatient.emergency_contact_name && (
+                      <Badge variant="secondary" className="text-xs">
+                        Emergency: {selectedPatient.emergency_contact_name} ({selectedPatient.emergency_contact_phone})
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                {/* Critical Alerts */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                  <div className="bg-destructive/10 rounded-lg p-3 border border-destructive/20">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertTriangle className="h-4 w-4 text-destructive" />
+                      <span className="text-sm font-semibold text-destructive">ALLERGIES</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedPatient.allergies?.length ? (
+                        selectedPatient.allergies.map((a, i) => (
+                          <Badge key={i} variant="destructive" className="text-xs">{a}</Badge>
+                        ))
+                      ) : (
+                        <span className="text-xs text-muted-foreground">None reported</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="bg-warning/10 rounded-lg p-3 border border-warning/20">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Activity className="h-4 w-4 text-warning" />
+                      <span className="text-sm font-semibold text-warning">CHRONIC CONDITIONS</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedPatient.chronic_conditions?.length ? (
+                        selectedPatient.chronic_conditions.map((c, i) => (
+                          <Badge key={i} variant="secondary" className="text-xs">{c}</Badge>
+                        ))
+                      ) : (
+                        <span className="text-xs text-muted-foreground">None reported</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="p-0">
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                  <div className="border-b px-4">
+                    <TabsList className="h-12 bg-transparent">
+                      <TabsTrigger value="details">Details</TabsTrigger>
+                      <TabsTrigger value="vitals">Vitals</TabsTrigger>
+                      <TabsTrigger value="labs">Lab Results</TabsTrigger>
+                      <TabsTrigger value="history">History</TabsTrigger>
+                      <TabsTrigger value="analysis">Analysis</TabsTrigger>
+                    </TabsList>
+                  </div>
+
+                  <ScrollArea className="h-[calc(100vh-520px)]">
+                    {/* Details Tab */}
+                    <TabsContent value="details" className="p-4 space-y-4 mt-0">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm">Personal Information</CardTitle>
+                          </CardHeader>
+                          <CardContent className="text-sm space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Date of Birth</span>
+                              <span>{format(new Date(selectedPatient.date_of_birth), 'MMM d, yyyy')}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">National ID</span>
+                              <span>{selectedPatient.national_id || 'N/A'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Address</span>
+                              <span>{selectedPatient.address || 'N/A'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">City</span>
+                              <span>{selectedPatient.city || 'N/A'}</span>
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm">Medical Information</CardTitle>
+                          </CardHeader>
+                          <CardContent className="text-sm space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Blood Type</span>
+                              <span>{selectedPatient.blood_type || 'Unknown'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Status</span>
+                              <Badge variant={selectedPatient.status === 'active' ? 'default' : 'secondary'}>
+                                {selectedPatient.status}
+                              </Badge>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Registered</span>
+                              <span>{format(new Date(selectedPatient.created_at), 'MMM d, yyyy')}</span>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm">Medical History</CardTitle>
+                        </CardHeader>
+                        <CardContent className="text-sm space-y-3">
+                          <div>
+                            <span className="text-muted-foreground">Current Medications:</span>
+                            <p className="mt-1">{selectedPatient.current_medications || 'None reported'}</p>
+                          </div>
+                          <Separator />
+                          <div>
+                            <span className="text-muted-foreground">Cardiovascular History:</span>
+                            <p className="mt-1">{selectedPatient.cardiovascular_history || 'None reported'}</p>
+                          </div>
+                          <Separator />
+                          <div>
+                            <span className="text-muted-foreground">Previous Surgeries:</span>
+                            <p className="mt-1">{selectedPatient.previous_surgeries || 'None reported'}</p>
+                          </div>
+                        </CardContent>
                       </Card>
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
+                    </TabsContent>
 
-              <TabsContent value="analysis" className="space-y-4 pr-4">
-                <div className="space-y-4">
-                  <div>
-                    <Label>Chief Complaint *</Label>
-                    <Textarea
-                      value={formData.chiefComplaint}
-                      onChange={(e) => setFormData(prev => ({ ...prev, chiefComplaint: e.target.value }))}
-                      placeholder="Patient's primary complaint and symptoms..."
-                      rows={3}
-                    />
-                  </div>
-                  <div>
-                    <Label>Clinical Findings</Label>
-                    <Textarea
-                      value={formData.clinicalFindings}
-                      onChange={(e) => setFormData(prev => ({ ...prev, clinicalFindings: e.target.value }))}
-                      placeholder="Physical examination findings, observations..."
-                      rows={3}
-                    />
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="requiresLabs"
-                      checked={formData.requiresLabTests}
-                      onCheckedChange={(checked) => setFormData(prev => ({ 
-                        ...prev, 
-                        requiresLabTests: checked as boolean,
-                        selectedLabTests: checked ? prev.selectedLabTests : []
-                      }))}
-                    />
-                    <Label htmlFor="requiresLabs">Order Lab Tests</Label>
-                  </div>
+                    {/* Vitals Tab */}
+                    <TabsContent value="vitals" className="p-4 space-y-4 mt-0">
+                      {vitalsLoading ? (
+                        <div className="text-center py-8 text-muted-foreground">Loading vitals...</div>
+                      ) : patientVitals?.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Activity className="mx-auto h-12 w-12 mb-2 opacity-50" />
+                          <p>No vitals recorded for this patient</p>
+                        </div>
+                      ) : (
+                        <>
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm flex items-center gap-2">
+                                <TrendingUp className="h-4 w-4" />
+                                Vital Signs Trends
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <VitalsTrendChart vitals={patientVitals || []} />
+                            </CardContent>
+                          </Card>
 
-                  {formData.requiresLabTests && (
-                    <Card className="bg-muted/50">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">Select Lab Tests</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-2 gap-4">
-                          {labTestTypes.map((category) => (
-                            <div key={category.type}>
-                              <Label className="text-xs font-medium text-muted-foreground">{category.type}</Label>
-                              <div className="mt-1 space-y-1">
-                                {category.tests.map((test) => (
-                                  <div key={test} className="flex items-center space-x-2">
-                                    <Checkbox
-                                      id={test}
-                                      checked={formData.selectedLabTests.includes(test)}
-                                      onCheckedChange={(checked) => {
-                                        if (checked) {
-                                          setFormData(prev => ({
-                                            ...prev,
-                                            selectedLabTests: [...prev.selectedLabTests, test]
-                                          }));
-                                        } else {
-                                          setFormData(prev => ({
-                                            ...prev,
-                                            selectedLabTests: prev.selectedLabTests.filter(t => t !== test)
-                                          }));
-                                        }
-                                      }}
-                                    />
-                                    <Label htmlFor={test} className="text-sm font-normal">{test}</Label>
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm">Recent Readings</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead>BP</TableHead>
+                                    <TableHead>HR</TableHead>
+                                    <TableHead>SpO2</TableHead>
+                                    <TableHead>Temp</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {patientVitals?.slice(0, 10).map((v) => (
+                                    <TableRow key={v.id}>
+                                      <TableCell className="text-xs">
+                                        {format(new Date(v.recorded_at), 'MMM d, HH:mm')}
+                                      </TableCell>
+                                      <TableCell>
+                                        <span className={v.systolic_bp > 140 || v.diastolic_bp > 90 ? 'text-destructive font-medium' : ''}>
+                                          {v.systolic_bp}/{v.diastolic_bp}
+                                        </span>
+                                      </TableCell>
+                                      <TableCell>
+                                        <span className={v.heart_rate > 100 || v.heart_rate < 60 ? 'text-warning font-medium' : ''}>
+                                          {v.heart_rate}
+                                        </span>
+                                      </TableCell>
+                                      <TableCell>
+                                        <span className={v.oxygen_saturation && v.oxygen_saturation < 95 ? 'text-destructive font-medium' : ''}>
+                                          {v.oxygen_saturation || '-'}%
+                                        </span>
+                                      </TableCell>
+                                      <TableCell>{v.temperature || '-'}°C</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </CardContent>
+                          </Card>
+                        </>
+                      )}
+                    </TabsContent>
+
+                    {/* Labs Tab */}
+                    <TabsContent value="labs" className="p-4 space-y-4 mt-0">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-sm font-medium">Lab Tests & Results</h3>
+                        <Button size="sm" onClick={() => setLabOrderDialogOpen(true)}>
+                          <Plus className="h-4 w-4 mr-1" />
+                          Order Lab Test
+                        </Button>
+                      </div>
+
+                      {labsLoading ? (
+                        <div className="text-center py-8 text-muted-foreground">Loading labs...</div>
+                      ) : patientLabTests?.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <FlaskConical className="mx-auto h-12 w-12 mb-2 opacity-50" />
+                          <p>No lab tests ordered for this patient</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {patientLabTests?.map((test: any) => (
+                            <Card key={test.id}>
+                              <CardHeader className="py-3">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <CardTitle className="text-sm">{test.test_name}</CardTitle>
+                                    <CardDescription className="text-xs">
+                                      {format(new Date(test.ordered_at), 'MMM d, yyyy')} • {test.test_type}
+                                    </CardDescription>
+                                  </div>
+                                  <Badge variant={test.status === 'completed' ? 'default' : test.status === 'in_progress' ? 'secondary' : 'outline'}>
+                                    {test.status}
+                                  </Badge>
+                                </div>
+                              </CardHeader>
+                              {test.lab_results?.length > 0 && (
+                                <CardContent className="pt-0">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="text-xs">Parameter</TableHead>
+                                        <TableHead className="text-xs">Value</TableHead>
+                                        <TableHead className="text-xs">Reference</TableHead>
+                                        <TableHead className="text-xs">Status</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {test.lab_results.map((result: LabResult) => (
+                                        <TableRow key={result.id}>
+                                          <TableCell className="text-sm">{result.parameter_name}</TableCell>
+                                          <TableCell className={`text-sm ${result.is_abnormal ? 'text-destructive font-medium' : ''}`}>
+                                            {result.value} {result.unit}
+                                          </TableCell>
+                                          <TableCell className="text-sm text-muted-foreground">{result.reference_range || '-'}</TableCell>
+                                          <TableCell>
+                                            {result.is_abnormal ? (
+                                              <Badge variant="destructive" className="text-xs">Abnormal</Badge>
+                                            ) : (
+                                              <Badge variant="outline" className="text-xs">Normal</Badge>
+                                            )}
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </CardContent>
+                              )}
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </TabsContent>
+
+                    {/* History Tab */}
+                    <TabsContent value="history" className="p-4 space-y-4 mt-0">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm flex items-center gap-2">
+                              <Calendar className="h-4 w-4" />
+                              Appointments ({patientAppointments?.length || 0})
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {patientAppointments?.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">No appointments</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {patientAppointments?.slice(0, 5).map((apt: any) => (
+                                  <div key={apt.id} className="flex items-center justify-between text-sm">
+                                    <span>{format(new Date(apt.appointment_date), 'MMM d, yyyy')}</span>
+                                    <Badge variant="outline" className="text-xs capitalize">{apt.status}</Badge>
                                   </div>
                                 ))}
                               </div>
-                            </div>
-                          ))}
+                            )}
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm flex items-center gap-2">
+                              <Syringe className="h-4 w-4" />
+                              Surgeries ({patientSurgeries?.length || 0})
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {patientSurgeries?.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">No surgeries</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {patientSurgeries?.slice(0, 5).map((surgery: any) => (
+                                  <div key={surgery.id} className="flex items-center justify-between text-sm">
+                                    <span className="truncate">{surgery.surgery_name}</span>
+                                    <Badge variant="outline" className="text-xs capitalize">{surgery.status}</Badge>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+
+                        <Card className="md:col-span-2">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm flex items-center gap-2">
+                              <Pill className="h-4 w-4" />
+                              Prescriptions ({patientPrescriptions?.length || 0})
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {patientPrescriptions?.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">No prescriptions</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {patientPrescriptions?.slice(0, 5).map((rx: any) => (
+                                  <div key={rx.id} className="flex items-center justify-between text-sm">
+                                    <div>
+                                      <span>{format(new Date(rx.prescribed_at), 'MMM d, yyyy')}</span>
+                                      <span className="text-muted-foreground ml-2">
+                                        ({rx.prescription_items?.length || 0} items)
+                                      </span>
+                                    </div>
+                                    <Badge variant="outline" className="text-xs capitalize">{rx.status}</Badge>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </TabsContent>
+
+                    {/* Analysis Tab */}
+                    <TabsContent value="analysis" className="p-4 space-y-4 mt-0">
+                      <div className="space-y-4">
+                        <div>
+                          <Label>Chief Complaint</Label>
+                          <Textarea
+                            value={analysisForm.chiefComplaint}
+                            onChange={(e) => setAnalysisForm(prev => ({ ...prev, chiefComplaint: e.target.value }))}
+                            placeholder="Patient's primary complaint and symptoms..."
+                            rows={3}
+                          />
                         </div>
-                      </CardContent>
-                    </Card>
-                  )}
+                        <div>
+                          <Label>Clinical Findings</Label>
+                          <Textarea
+                            value={analysisForm.clinicalFindings}
+                            onChange={(e) => setAnalysisForm(prev => ({ ...prev, clinicalFindings: e.target.value }))}
+                            placeholder="Physical examination findings, observations..."
+                            rows={3}
+                          />
+                        </div>
+                        <div>
+                          <Label>Diagnosis</Label>
+                          <Textarea
+                            value={analysisForm.diagnosis}
+                            onChange={(e) => setAnalysisForm(prev => ({ ...prev, diagnosis: e.target.value }))}
+                            placeholder="Final diagnosis based on findings..."
+                            rows={2}
+                          />
+                        </div>
+                        <div>
+                          <Label>Treatment Plan</Label>
+                          <Textarea
+                            value={analysisForm.treatmentPlan}
+                            onChange={(e) => setAnalysisForm(prev => ({ ...prev, treatmentPlan: e.target.value }))}
+                            placeholder="Recommended treatment approach..."
+                            rows={2}
+                          />
+                        </div>
 
-                  <div>
-                    <Label>Additional Notes</Label>
-                    <Textarea
-                      value={formData.notes}
-                      onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                      placeholder="Any additional observations or notes..."
-                      rows={2}
-                    />
-                  </div>
+                        <Separator />
+
+                        <div>
+                          <Label className="text-base font-semibold">Treatment Decision</Label>
+                          <p className="text-sm text-muted-foreground mb-4">Choose the appropriate treatment pathway</p>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Card 
+                              className="cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+                              onClick={handlePrescriptionClick}
+                            >
+                              <CardContent className="pt-6 text-center">
+                                <Pill className="h-10 w-10 mx-auto text-primary mb-3" />
+                                <h4 className="font-semibold">Prescribe Medication</h4>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Write a prescription for medications
+                                </p>
+                                <Button className="mt-4 w-full" variant="outline">
+                                  Go to Prescriptions
+                                  <ArrowRight className="h-4 w-4 ml-2" />
+                                </Button>
+                              </CardContent>
+                            </Card>
+
+                            <Card 
+                              className="cursor-pointer hover:ring-2 hover:ring-destructive transition-all"
+                              onClick={() => setSurgeryDialogOpen(true)}
+                            >
+                              <CardContent className="pt-6 text-center">
+                                <Syringe className="h-10 w-10 mx-auto text-destructive mb-3" />
+                                <h4 className="font-semibold">Refer for Surgery</h4>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Schedule a surgical procedure
+                                </p>
+                                <Button className="mt-4 w-full" variant="outline">
+                                  Schedule Surgery
+                                  <ArrowRight className="h-4 w-4 ml-2" />
+                                </Button>
+                              </CardContent>
+                            </Card>
+                          </div>
+                        </div>
+                      </div>
+                    </TabsContent>
+                  </ScrollArea>
+                </Tabs>
+              </CardContent>
+            </>
+          )}
+        </Card>
+      </div>
+
+      {/* Lab Order Dialog */}
+      <Dialog open={labOrderDialogOpen} onOpenChange={setLabOrderDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Order Lab Tests</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Test Category</Label>
+              <Select value={selectedTestType} onValueChange={setSelectedTestType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {labTestTypes.map((cat) => (
+                    <SelectItem key={cat.type} value={cat.type}>{cat.type}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedTestType && (
+              <div>
+                <Label>Select Tests</Label>
+                <div className="mt-2 space-y-2 max-h-40 overflow-y-auto">
+                  {labTestTypes.find(t => t.type === selectedTestType)?.tests.map((test) => (
+                    <div key={test} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={test}
+                        checked={selectedTests.includes(test)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedTests(prev => [...prev, test]);
+                          } else {
+                            setSelectedTests(prev => prev.filter(t => t !== test));
+                          }
+                        }}
+                      />
+                      <Label htmlFor={test} className="font-normal">{test}</Label>
+                    </div>
+                  ))}
                 </div>
-              </TabsContent>
-            </ScrollArea>
-          </Tabs>
+              </div>
+            )}
 
-          <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setConsultationDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => consultationMutation.mutate({
-                appointmentId: selectedAppointment?.id,
-                patientId: selectedAppointment?.patient_id,
-              })}
-              disabled={!formData.chiefComplaint || consultationMutation.isPending}
+            <div>
+              <Label>Priority</Label>
+              <Select value={labPriority} onValueChange={setLabPriority}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="routine">Routine</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                  <SelectItem value="stat">STAT</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Notes</Label>
+              <Textarea
+                value={labNotes}
+                onChange={(e) => setLabNotes(e.target.value)}
+                placeholder="Clinical notes for lab..."
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLabOrderDialogOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={() => orderLabMutation.mutate()}
+              disabled={selectedTests.length === 0 || orderLabMutation.isPending}
             >
-              {consultationMutation.isPending ? 'Saving...' : 'Save Consultation'}
+              {orderLabMutation.isPending ? 'Ordering...' : `Order ${selectedTests.length} Test(s)`}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Decision Dialog - After Lab Results */}
-      <Dialog open={decisionDialogOpen} onOpenChange={setDecisionDialogOpen}>
+      {/* Surgery Referral Dialog */}
+      <Dialog open={surgeryDialogOpen} onOpenChange={setSurgeryDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Treatment Decision</DialogTitle>
+            <DialogTitle>Surgery Referral</DialogTitle>
           </DialogHeader>
-          
           <div className="space-y-4">
             <div>
-              <Label>Final Diagnosis *</Label>
+              <Label>Surgery Name *</Label>
+              <Input
+                value={surgeryForm.surgeryName}
+                onChange={(e) => setSurgeryForm(prev => ({ ...prev, surgeryName: e.target.value }))}
+                placeholder="e.g., Coronary Bypass Surgery"
+              />
+            </div>
+            <div>
+              <Label>Surgery Type *</Label>
+              <Select 
+                value={surgeryForm.surgeryType} 
+                onValueChange={(v) => setSurgeryForm(prev => ({ ...prev, surgeryType: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cardiac">Cardiac Surgery</SelectItem>
+                  <SelectItem value="vascular">Vascular Surgery</SelectItem>
+                  <SelectItem value="interventional">Interventional Procedure</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Reason for Surgery *</Label>
               <Textarea
-                value={formData.diagnosis}
-                onChange={(e) => setFormData(prev => ({ ...prev, diagnosis: e.target.value }))}
-                placeholder="Enter the final diagnosis..."
+                value={surgeryForm.reason}
+                onChange={(e) => setSurgeryForm(prev => ({ ...prev, reason: e.target.value }))}
+                placeholder="Clinical justification for surgical intervention..."
                 rows={3}
               />
             </div>
-            
             <div>
-              <Label>Treatment Plan *</Label>
+              <Label>Additional Notes</Label>
               <Textarea
-                value={formData.treatmentPlan}
-                onChange={(e) => setFormData(prev => ({ ...prev, treatmentPlan: e.target.value }))}
-                placeholder="Describe the recommended treatment plan..."
-                rows={3}
+                value={surgeryForm.notes}
+                onChange={(e) => setSurgeryForm(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Notes for surgical team..."
+                rows={2}
               />
             </div>
-
-            <Separator />
-
-            <div>
-              <Label>Treatment Decision *</Label>
-              <div className="grid grid-cols-2 gap-4 mt-2">
-                <Card 
-                  className={`cursor-pointer transition-all ${decision === 'prescription' ? 'ring-2 ring-primary' : ''}`}
-                  onClick={() => setDecision('prescription')}
-                >
-                  <CardContent className="pt-4 text-center">
-                    <Pill className="h-8 w-8 mx-auto text-primary mb-2" />
-                    <p className="font-medium">Prescribe Medication</p>
-                    <p className="text-xs text-muted-foreground">Proceed to write prescription</p>
-                  </CardContent>
-                </Card>
-                <Card 
-                  className={`cursor-pointer transition-all ${decision === 'surgery' ? 'ring-2 ring-primary' : ''}`}
-                  onClick={() => setDecision('surgery')}
-                >
-                  <CardContent className="pt-4 text-center">
-                    <Syringe className="h-8 w-8 mx-auto text-destructive mb-2" />
-                    <p className="font-medium">Refer to Surgery</p>
-                    <p className="text-xs text-muted-foreground">Schedule surgical procedure</p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-
-            {decision === 'surgery' && (
-              <div>
-                <Label>Surgery Referral Notes</Label>
-                <Textarea
-                  value={surgeryNotes}
-                  onChange={(e) => setSurgeryNotes(e.target.value)}
-                  placeholder="Notes for the surgical team..."
-                  rows={2}
-                />
-              </div>
-            )}
           </div>
-
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDecisionDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => completeConsultationMutation.mutate()}
-              disabled={!formData.diagnosis || !formData.treatmentPlan || !decision || completeConsultationMutation.isPending}
+            <Button variant="outline" onClick={() => setSurgeryDialogOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={() => createSurgeryMutation.mutate()}
+              disabled={!surgeryForm.surgeryName || !surgeryForm.surgeryType || !surgeryForm.reason || createSurgeryMutation.isPending}
             >
-              {completeConsultationMutation.isPending ? 'Processing...' : 'Proceed'}
+              {createSurgeryMutation.isPending ? 'Scheduling...' : 'Schedule Surgery'}
             </Button>
           </DialogFooter>
         </DialogContent>
