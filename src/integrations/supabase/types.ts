@@ -794,6 +794,7 @@ export type Database = {
       }
       system_settings: {
         Row: {
+          enabled_modules: Json | null
           id: string
           logo_url: string | null
           site_name: string
@@ -801,6 +802,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          enabled_modules?: Json | null
           id?: string
           logo_url?: string | null
           site_name?: string
@@ -808,6 +810,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          enabled_modules?: Json | null
           id?: string
           logo_url?: string | null
           site_name?: string

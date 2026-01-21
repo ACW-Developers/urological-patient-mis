@@ -43,11 +43,35 @@ export interface UserRole {
   created_at: string;
 }
 
+export interface ModuleVisibility {
+  dashboard: boolean;
+  patients: boolean;
+  register_patient: boolean;
+  vitals: boolean;
+  appointments: boolean;
+  my_patients: boolean;
+  consultation: boolean;
+  my_schedule: boolean;
+  lab_orders: boolean;
+  lab_results: boolean;
+  prescriptions: boolean;
+  pharmacy: boolean;
+  pre_operative: boolean;
+  intra_operative: boolean;
+  post_operative: boolean;
+  icu: boolean;
+  follow_ups: boolean;
+  reports: boolean;
+  user_management: boolean;
+  settings: boolean;
+}
+
 export interface SystemSettings {
   id: string;
   site_name: string;
   logo_url?: string;
   theme: string;
+  enabled_modules?: ModuleVisibility;
   updated_at: string;
 }
 

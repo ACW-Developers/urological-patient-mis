@@ -21,7 +21,9 @@ import LabResults from "./pages/LabResults";
 import DoctorLabResults from "./pages/DoctorLabResults";
 import Prescriptions from "./pages/Prescriptions";
 import Pharmacy from "./pages/Pharmacy";
-import Surgeries from "./pages/Surgeries";
+import PreOperative from "./pages/PreOperative";
+import IntraOperative from "./pages/IntraOperative";
+import PostOperative from "./pages/PostOperative";
 import ICU from "./pages/ICU";
 import FollowUps from "./pages/FollowUps";
 import UserManagement from "./pages/UserManagement";
@@ -32,7 +34,6 @@ import DoctorSchedule from "./pages/DoctorSchedule";
 import DoctorAppointments from "./pages/DoctorAppointments";
 import DoctorConsultation from "./pages/DoctorConsultation";
 import PatientDetail from "./pages/PatientDetail";
-import SurgeryWorkflow from "./pages/SurgeryWorkflow";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
@@ -86,9 +87,14 @@ const App = () => (
                   <Route path="/pharmacy" element={
                     <ProtectedRoute allowedRoles={['admin', 'pharmacist']}><Pharmacy /></ProtectedRoute>
                   } />
-                  <Route path="/surgeries" element={<Surgeries />} />
-                  <Route path="/surgeries/:id" element={
-                    <ProtectedRoute allowedRoles={['admin', 'doctor', 'nurse']}><SurgeryWorkflow /></ProtectedRoute>
+                  <Route path="/pre-operative" element={
+                    <ProtectedRoute allowedRoles={['admin', 'doctor', 'nurse']}><PreOperative /></ProtectedRoute>
+                  } />
+                  <Route path="/intra-operative" element={
+                    <ProtectedRoute allowedRoles={['admin', 'doctor', 'nurse']}><IntraOperative /></ProtectedRoute>
+                  } />
+                  <Route path="/post-operative" element={
+                    <ProtectedRoute allowedRoles={['admin', 'doctor', 'nurse']}><PostOperative /></ProtectedRoute>
                   } />
                   <Route path="/icu" element={<ICU />} />
                   <Route path="/follow-ups" element={<FollowUps />} />

@@ -23,7 +23,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         .single();
       
       if (data) {
-        setSettings(data as SystemSettings);
+        setSettings(data as unknown as SystemSettings);
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -41,13 +41,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     
     const { data, error } = await supabase
       .from('system_settings')
-      .update(updates)
+      .update(updates as Record<string, unknown>)
       .eq('id', settings.id)
       .select()
       .single();
 
     if (error) throw error;
-    if (data) setSettings(data as SystemSettings);
+    if (data) setSettings(data as unknown as SystemSettings);
   };
 
   const refetch = async () => {

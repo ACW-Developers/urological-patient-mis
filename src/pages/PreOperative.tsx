@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -18,7 +18,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Plus, Syringe, Search, ClipboardCheck, Play, CheckCircle, FileEdit, CalendarIcon, Stethoscope, Trash2 } from 'lucide-react';
+import { Plus, ClipboardCheck, Search, CalendarIcon, Stethoscope, CheckCircle, AlertTriangle, Trash2, ArrowRight } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import type { Surgery, Patient } from '@/types/database';
 import { cn } from '@/lib/utils';
@@ -29,17 +29,26 @@ const surgeryTypes = [
   { type: 'diagnostic', procedures: ['Cardiac Catheterization', 'Electrophysiology Study', 'Biopsy'] },
 ];
 
-const whoChecklistItems = [
-  'Patient identity confirmed',
-  'Surgical site marked',
-  'Anesthesia safety check complete',
-  'Pulse oximeter functioning',
-  'Known allergies reviewed',
-  'Airway/aspiration risk assessed',
-  'Blood loss risk assessed (>500ml)',
-  'Venous access and fluids planned',
-  'Antibiotic prophylaxis given',
-  'Essential imaging displayed',
+// WHO Sign-In Checklist (Before induction of anesthesia)
+const signInChecklistItems = [
+  'Patient has confirmed identity, site, procedure, and consent',
+  'Site marked / not applicable',
+  'Anesthesia safety check completed',
+  'Pulse oximeter on patient and functioning',
+  'Does patient have a known allergy? (If yes, documented)',
+  'Difficult airway / aspiration risk? (Equipment/assistance available)',
+  'Risk of >500ml blood loss? (Adequate access and fluids planned)',
+];
+
+// WHO Time-Out Checklist (Before skin incision)
+const timeOutChecklistItems = [
+  'Confirm all team members have introduced themselves by name and role',
+  'Surgeon, anesthetist, and nurse verbally confirm: patient, site, procedure',
+  'Anticipated critical events reviewed by surgeon',
+  'Anticipated critical events reviewed by anesthetist',
+  'Anticipated critical events reviewed by nursing team',
+  'Has antibiotic prophylaxis been given within the last 60 minutes?',
+  'Is essential imaging displayed?',
 ];
 
 interface ConsultationReferral {
@@ -50,17 +59,17 @@ interface ConsultationReferral {
   patient?: Patient;
 }
 
-export default function Surgeries() {
+export default function PreOperative() {
   const navigate = useNavigate();
   const { user, role } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [checklistDialogOpen, setChecklistDialogOpen] = useState(false);
   const [selectedSurgery, setSelectedSurgery] = useState<(Surgery & { patient: Patient }) | null>(null);
-  const [checkedItems, setCheckedItems] = useState<boolean[]>(new Array(whoChecklistItems.length).fill(false));
-  const [activeTab, setActiveTab] = useState('surgeries');
+  const [signInChecked, setSignInChecked] = useState<boolean[]>(new Array(signInChecklistItems.length).fill(false));
+  const [timeOutChecked, setTimeOutChecked] = useState<boolean[]>(new Array(timeOutChecklistItems.length).fill(false));
+  const [activeTab, setActiveTab] = useState('pending');
 
   // Form state
   const [selectedPatient, setSelectedPatient] = useState<string>('');
@@ -73,11 +82,12 @@ export default function Surgeries() {
   const [preOpAssessment, setPreOpAssessment] = useState<string>('');
 
   const { data: surgeries, isLoading } = useQuery({
-    queryKey: ['surgeries'],
+    queryKey: ['preop-surgeries'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('surgeries')
         .select('*, patient:patients(*)')
+        .in('status', ['scheduled', 'pre_op_complete'])
         .order('scheduled_date', { ascending: true });
       if (error) throw error;
       return data as (Surgery & { patient: Patient })[];
@@ -126,11 +136,12 @@ export default function Surgeries() {
         duration_minutes: parseInt(durationMinutes) || 120,
         operating_room: operatingRoom || null,
         pre_op_assessment: preOpAssessment || null,
+        status: 'scheduled',
       });
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['surgeries'] });
+      queryClient.invalidateQueries({ queryKey: ['preop-surgeries'] });
       toast.success('Surgery scheduled successfully');
       setDialogOpen(false);
       resetForm();
@@ -139,41 +150,6 @@ export default function Surgeries() {
       toast.error(error.message);
     },
   });
-
-  const updateSurgeryMutation = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Record<string, unknown> }) => {
-      const { error } = await supabase.from('surgeries').update(updates).eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['surgeries'] });
-      toast.success('Surgery updated');
-      setChecklistDialogOpen(false);
-      setSelectedSurgery(null);
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
-
-  const deleteSurgeryMutation = useMutation({
-    mutationFn: async (surgeryId: string) => {
-      const { error } = await supabase
-        .from('surgeries')
-        .delete()
-        .eq('id', surgeryId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['surgeries'] });
-      toast.success('Surgery deleted successfully');
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
-
-  const isAdmin = role === 'admin';
 
   const scheduleFromReferralMutation = useMutation({
     mutationFn: async (referral: ConsultationReferral) => {
@@ -189,6 +165,7 @@ export default function Surgeries() {
         duration_minutes: parseInt(durationMinutes) || 120,
         operating_room: operatingRoom || null,
         pre_op_assessment: referral.surgery_referral_notes || preOpAssessment || null,
+        status: 'scheduled',
       });
       if (surgeryError) throw surgeryError;
 
@@ -200,11 +177,41 @@ export default function Surgeries() {
       if (updateError) throw updateError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['surgeries'] });
+      queryClient.invalidateQueries({ queryKey: ['preop-surgeries'] });
       queryClient.invalidateQueries({ queryKey: ['surgery-referrals'] });
       toast.success('Surgery scheduled from referral');
       setDialogOpen(false);
       resetForm();
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const updateSurgeryMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Record<string, unknown> }) => {
+      const { error } = await supabase.from('surgeries').update(updates).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['preop-surgeries'] });
+      toast.success('Pre-operative checklist completed');
+      setChecklistDialogOpen(false);
+      setSelectedSurgery(null);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const deleteSurgeryMutation = useMutation({
+    mutationFn: async (surgeryId: string) => {
+      const { error } = await supabase.from('surgeries').delete().eq('id', surgeryId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['preop-surgeries'] });
+      toast.success('Surgery deleted successfully');
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -222,30 +229,39 @@ export default function Surgeries() {
     setPreOpAssessment('');
   };
 
-  const completeChecklist = () => {
+  const openChecklist = (surgery: Surgery & { patient: Patient }) => {
+    setSelectedSurgery(surgery);
+    setSignInChecked(new Array(signInChecklistItems.length).fill(false));
+    setTimeOutChecked(new Array(timeOutChecklistItems.length).fill(false));
+    setChecklistDialogOpen(true);
+  };
+
+  const completePreOpChecklist = () => {
     if (!selectedSurgery) return;
-    if (!checkedItems.every(Boolean)) {
+    const allSignInComplete = signInChecked.every(Boolean);
+    const allTimeOutComplete = timeOutChecked.every(Boolean);
+    
+    if (!allSignInComplete || !allTimeOutComplete) {
       toast.error('Please complete all checklist items');
       return;
     }
+    
     updateSurgeryMutation.mutate({
       id: selectedSurgery.id,
-      updates: { who_checklist_completed: true },
+      updates: { 
+        who_checklist_completed: true,
+        pre_op_tests_completed: true,
+        status: 'pre_op_complete'
+      },
     });
   };
 
-  const startSurgery = (surgery: Surgery) => {
-    updateSurgeryMutation.mutate({
-      id: surgery.id,
-      updates: { status: 'in_progress' },
-    });
-  };
-
-  const completeSurgery = (surgery: Surgery) => {
-    updateSurgeryMutation.mutate({
-      id: surgery.id,
-      updates: { status: 'completed' },
-    });
+  const moveToSurgery = (surgery: Surgery) => {
+    if (!surgery.who_checklist_completed) {
+      toast.error('Complete the WHO checklist before proceeding to surgery');
+      return;
+    }
+    navigate(`/intra-operative?surgeryId=${surgery.id}`);
   };
 
   const openScheduleFromReferral = (referral: ConsultationReferral) => {
@@ -259,30 +275,22 @@ export default function Surgeries() {
       s.patient?.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.patient?.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.surgery_name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    return matchesSearch;
   });
 
-  const getStatusBadge = (status: string) => {
-    const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
-      scheduled: { variant: 'outline', label: 'Scheduled' },
-      in_progress: { variant: 'secondary', label: 'In Progress' },
-      completed: { variant: 'default', label: 'Completed' },
-      cancelled: { variant: 'destructive', label: 'Cancelled' },
-    };
-    const c = config[status] || { variant: 'outline', label: status };
-    return <Badge variant={c.variant}>{c.label}</Badge>;
-  };
+  const pendingSurgeries = filteredSurgeries?.filter(s => s.status === 'scheduled' && !s.who_checklist_completed);
+  const readySurgeries = filteredSurgeries?.filter(s => s.who_checklist_completed && s.status === 'pre_op_complete');
 
   const availableProcedures = surgeryTypes.find((t) => t.type === surgeryType)?.procedures || [];
   const canSchedule = role === 'admin' || role === 'doctor';
+  const isAdmin = role === 'admin';
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-foreground">Surgeries</h1>
-          <p className="text-muted-foreground">Schedule and manage surgical procedures</p>
+          <h1 className="text-3xl font-display font-bold text-foreground">Pre-Operative Module</h1>
+          <p className="text-muted-foreground">Schedule surgeries and complete WHO safety checklists</p>
         </div>
         {canSchedule && (
           <Button className="gradient-primary glow-primary" onClick={() => { resetForm(); setDialogOpen(true); }}>
@@ -291,17 +299,60 @@ export default function Surgeries() {
         )}
       </div>
 
-      {/* Tabs for Surgeries and Referrals */}
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Pending Checklist</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{pendingSurgeries?.length || 0}</div>
+            <p className="text-xs text-muted-foreground">Awaiting WHO checklist completion</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Ready for Surgery</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{readySurgeries?.length || 0}</div>
+            <p className="text-xs text-muted-foreground">Pre-op complete, ready to proceed</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Surgery Referrals</CardTitle>
+            <Stethoscope className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{surgeryReferrals?.length || 0}</div>
+            <p className="text-xs text-muted-foreground">From doctor consultations</p>
+          </CardContent>
+        </Card>
+      </div>
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="surgeries" className="gap-2">
-            <Syringe className="h-4 w-4" />
-            All Surgeries
+          <TabsTrigger value="pending" className="gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            Pending Checklist
+            {pendingSurgeries && pendingSurgeries.length > 0 && (
+              <Badge variant="secondary" className="ml-1">{pendingSurgeries.length}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="ready" className="gap-2">
+            <CheckCircle className="h-4 w-4" />
+            Ready for Surgery
+            {readySurgeries && readySurgeries.length > 0 && (
+              <Badge variant="default" className="ml-1">{readySurgeries.length}</Badge>
+            )}
           </TabsTrigger>
           {canSchedule && (
             <TabsTrigger value="referrals" className="gap-2">
               <Stethoscope className="h-4 w-4" />
-              Surgery Referrals
+              Referrals
               {surgeryReferrals && surgeryReferrals.length > 0 && (
                 <Badge variant="secondary" className="ml-1">{surgeryReferrals.length}</Badge>
               )}
@@ -309,8 +360,8 @@ export default function Surgeries() {
           )}
         </TabsList>
 
-        {/* Surgeries Tab */}
-        <TabsContent value="surgeries">
+        {/* Pending Checklist Tab */}
+        <TabsContent value="pending">
           <Card>
             <CardHeader>
               <div className="flex flex-col sm:flex-row gap-4">
@@ -323,132 +374,145 @@ export default function Surgeries() {
                     className="pl-10"
                   />
                 </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="scheduled">Scheduled</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </CardHeader>
             <CardContent>
               {isLoading ? (
                 <div className="text-center py-8 text-muted-foreground">Loading...</div>
-              ) : filteredSurgeries?.length === 0 ? (
+              ) : pendingSurgeries?.length === 0 ? (
                 <div className="text-center py-8">
-                  <Syringe className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                  <p className="mt-2 text-muted-foreground">No surgeries found</p>
+                  <ClipboardCheck className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                  <p className="mt-2 text-muted-foreground">No surgeries pending checklist</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Patient</TableHead>
-                        <TableHead>Procedure</TableHead>
-                        <TableHead>Date/Time</TableHead>
-                        <TableHead>Room</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Checklist</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredSurgeries?.map((surgery) => (
-                        <TableRow key={surgery.id}>
-                          <TableCell className="font-medium">
-                            {surgery.patient?.first_name} {surgery.patient?.last_name}
-                            <div className="text-xs text-muted-foreground">{surgery.patient?.patient_number}</div>
-                          </TableCell>
-                          <TableCell>
-                            {surgery.surgery_name}
-                            <div className="text-xs text-muted-foreground capitalize">{surgery.surgery_type}</div>
-                          </TableCell>
-                          <TableCell>
-                            {format(new Date(surgery.scheduled_date), 'MMM d, yyyy')}
-                            <div className="text-xs text-muted-foreground">{surgery.scheduled_time}</div>
-                          </TableCell>
-                          <TableCell>{surgery.operating_room || '-'}</TableCell>
-                          <TableCell>{getStatusBadge(surgery.status)}</TableCell>
-                          <TableCell>
-                            {surgery.who_checklist_completed ? (
-                              <Badge variant="default" className="gap-1">
-                                <CheckCircle className="h-3 w-3" /> Complete
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline">Pending</Badge>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Patient</TableHead>
+                      <TableHead>Procedure</TableHead>
+                      <TableHead>Scheduled</TableHead>
+                      <TableHead>Room</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingSurgeries?.map((surgery) => (
+                      <TableRow key={surgery.id}>
+                        <TableCell className="font-medium">
+                          {surgery.patient?.first_name} {surgery.patient?.last_name}
+                          <div className="text-xs text-muted-foreground">{surgery.patient?.patient_number}</div>
+                        </TableCell>
+                        <TableCell>
+                          {surgery.surgery_name}
+                          <div className="text-xs text-muted-foreground capitalize">{surgery.surgery_type}</div>
+                        </TableCell>
+                        <TableCell>
+                          {format(new Date(surgery.scheduled_date), 'MMM d, yyyy')}
+                          <div className="text-xs text-muted-foreground">{surgery.scheduled_time}</div>
+                        </TableCell>
+                        <TableCell>{surgery.operating_room || '-'}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2 flex-wrap">
+                            <Button size="sm" onClick={() => openChecklist(surgery)}>
+                              <ClipboardCheck className="h-4 w-4 mr-1" /> WHO Checklist
+                            </Button>
+                            {isAdmin && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete surgery?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This will permanently delete this surgery record.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => deleteSurgeryMutation.mutate(surgery.id)}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2 flex-wrap">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => navigate(`/surgeries/${surgery.id}`)}
-                              >
-                                <FileEdit className="h-4 w-4 mr-1" /> Manage
-                              </Button>
-                              {surgery.status === 'scheduled' && !surgery.who_checklist_completed && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setSelectedSurgery(surgery);
-                                    setCheckedItems(new Array(whoChecklistItems.length).fill(false));
-                                    setChecklistDialogOpen(true);
-                                  }}
-                                >
-                                  <ClipboardCheck className="h-4 w-4 mr-1" /> Checklist
-                                </Button>
-                              )}
-                              {surgery.status === 'scheduled' && surgery.who_checklist_completed && (
-                                <Button size="sm" variant="outline" onClick={() => startSurgery(surgery)}>
-                                  <Play className="h-4 w-4 mr-1" /> Start
-                                </Button>
-                              )}
-                              {surgery.status === 'in_progress' && (
-                                <Button size="sm" variant="default" onClick={() => completeSurgery(surgery)}>
-                                  <CheckCircle className="h-4 w-4 mr-1" /> Complete
-                                </Button>
-                              )}
-                              {isAdmin && (
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:text-destructive">
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Delete surgery?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        This will permanently delete this surgery record from the database.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() => deleteSurgeryMutation.mutate(surgery.id)}
-                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                      >
-                                        {deleteSurgeryMutation.isPending ? 'Deleting...' : 'Delete'}
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Ready for Surgery Tab */}
+        <TabsContent value="ready">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-500" />
+                Ready for Intra-Operative Procedure
+              </CardTitle>
+              <CardDescription>
+                These patients have completed all pre-operative requirements and WHO safety checklists
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {readySurgeries?.length === 0 ? (
+                <div className="text-center py-8">
+                  <CheckCircle className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                  <p className="mt-2 text-muted-foreground">No surgeries ready</p>
                 </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Patient</TableHead>
+                      <TableHead>Procedure</TableHead>
+                      <TableHead>Scheduled</TableHead>
+                      <TableHead>Room</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {readySurgeries?.map((surgery) => (
+                      <TableRow key={surgery.id}>
+                        <TableCell className="font-medium">
+                          {surgery.patient?.first_name} {surgery.patient?.last_name}
+                          <div className="text-xs text-muted-foreground">{surgery.patient?.patient_number}</div>
+                        </TableCell>
+                        <TableCell>
+                          {surgery.surgery_name}
+                          <div className="text-xs text-muted-foreground capitalize">{surgery.surgery_type}</div>
+                        </TableCell>
+                        <TableCell>
+                          {format(new Date(surgery.scheduled_date), 'MMM d, yyyy')}
+                          <div className="text-xs text-muted-foreground">{surgery.scheduled_time}</div>
+                        </TableCell>
+                        <TableCell>{surgery.operating_room || '-'}</TableCell>
+                        <TableCell>
+                          <Badge variant="default" className="gap-1">
+                            <CheckCircle className="h-3 w-3" /> Pre-Op Complete
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button size="sm" onClick={() => moveToSurgery(surgery)} className="gap-1">
+                            Proceed to Surgery <ArrowRight className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
@@ -639,43 +703,78 @@ export default function Surgeries() {
 
       {/* WHO Checklist Dialog */}
       <Dialog open={checklistDialogOpen} onOpenChange={setChecklistDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>WHO Surgical Safety Checklist</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="p-3 bg-muted rounded-lg">
               <p className="font-medium">{selectedSurgery?.patient?.first_name} {selectedSurgery?.patient?.last_name}</p>
-              <p className="text-sm text-muted-foreground">{selectedSurgery?.surgery_name}</p>
+              <p className="text-sm text-muted-foreground">{selectedSurgery?.surgery_name} - {selectedSurgery?.operating_room}</p>
             </div>
-            <div className="space-y-2 max-h-[50vh] overflow-y-auto">
-              {whoChecklistItems.map((item, index) => (
-                <div key={index} className="flex items-center space-x-3 p-2 hover:bg-muted/50 rounded">
-                  <Checkbox
-                    id={`checklist-${index}`}
-                    checked={checkedItems[index]}
-                    onCheckedChange={(checked) => {
-                      const updated = [...checkedItems];
-                      updated[index] = !!checked;
-                      setCheckedItems(updated);
-                    }}
-                  />
-                  <Label htmlFor={`checklist-${index}`} className="cursor-pointer flex-1">
-                    {item}
-                  </Label>
-                </div>
-              ))}
+
+            {/* Sign-In Checklist */}
+            <div>
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <Badge variant="outline">SIGN IN</Badge>
+                Before Induction of Anesthesia
+              </h3>
+              <div className="space-y-2">
+                {signInChecklistItems.map((item, index) => (
+                  <div key={index} className="flex items-start space-x-3 p-2 hover:bg-muted/50 rounded">
+                    <Checkbox
+                      id={`signin-${index}`}
+                      checked={signInChecked[index]}
+                      onCheckedChange={(checked) => {
+                        const updated = [...signInChecked];
+                        updated[index] = !!checked;
+                        setSignInChecked(updated);
+                      }}
+                    />
+                    <Label htmlFor={`signin-${index}`} className="cursor-pointer flex-1 text-sm">
+                      {item}
+                    </Label>
+                  </div>
+                ))}
+              </div>
             </div>
+
+            {/* Time-Out Checklist */}
+            <div>
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <Badge variant="outline">TIME OUT</Badge>
+                Before Skin Incision
+              </h3>
+              <div className="space-y-2">
+                {timeOutChecklistItems.map((item, index) => (
+                  <div key={index} className="flex items-start space-x-3 p-2 hover:bg-muted/50 rounded">
+                    <Checkbox
+                      id={`timeout-${index}`}
+                      checked={timeOutChecked[index]}
+                      onCheckedChange={(checked) => {
+                        const updated = [...timeOutChecked];
+                        updated[index] = !!checked;
+                        setTimeOutChecked(updated);
+                      }}
+                    />
+                    <Label htmlFor={`timeout-${index}`} className="cursor-pointer flex-1 text-sm">
+                      {item}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setChecklistDialogOpen(false)}>
                 Cancel
               </Button>
               <Button
                 className="flex-1"
-                onClick={completeChecklist}
-                disabled={!checkedItems.every(Boolean) || updateSurgeryMutation.isPending}
+                onClick={completePreOpChecklist}
+                disabled={!signInChecked.every(Boolean) || !timeOutChecked.every(Boolean) || updateSurgeryMutation.isPending}
               >
-                {updateSurgeryMutation.isPending ? 'Saving...' : 'Complete Checklist'}
+                {updateSurgeryMutation.isPending ? 'Saving...' : 'Complete Pre-Op Checklist'}
               </Button>
             </div>
           </div>
