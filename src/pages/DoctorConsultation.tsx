@@ -248,9 +248,9 @@ export default function DoctorConsultationPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['patient-surgeries', selectedPatient?.id] });
-      toast.success('Surgery scheduled successfully');
+      toast.success('Surgery scheduled and sent to Pre-Operative module');
       setSurgeryDialogOpen(false);
-      navigate('/surgeries');
+      navigate('/pre-operative');
     },
     onError: (error: Error) => {
       toast.error(error.message);
