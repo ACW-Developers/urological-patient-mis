@@ -34,32 +34,32 @@ interface NavItem {
   icon: React.ElementType;
   path: string;
   roles: string[];
+  moduleKey?: string; // Maps to enabled_modules key
 }
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', roles: ['admin', 'nurse', 'doctor', 'lab_technician', 'pharmacist'] },
-  { label: 'Patients', icon: Users, path: '/patients', roles: ['admin', 'nurse', 'doctor'] },
-  { label: 'Register Patient', icon: UserPlus, path: '/patients/register', roles: ['admin', 'nurse'] },
-  { label: 'Vitals', icon: Activity, path: '/vitals', roles: ['admin', 'nurse'] },
-  { label: 'Appointments', icon: Calendar, path: '/appointments', roles: ['admin', 'nurse', 'doctor'] },
-  { label: 'My Patients', icon: Stethoscope, path: '/doctor/patients', roles: ['doctor'] },
-  { label: 'Consultation', icon: Stethoscope, path: '/doctor/consultation', roles: ['doctor', 'admin'] },
-  { label: 'My Schedule', icon: Clock, path: '/doctor/schedule', roles: ['doctor'] },
-  { label: 'Lab Orders', icon: FlaskConical, path: '/lab/orders', roles: ['admin', 'doctor', 'lab_technician'] },
-  { label: 'Lab Results', icon: ClipboardList, path: '/lab/results', roles: ['admin', 'lab_technician'] },
-  { label: 'Lab Results', icon: ClipboardList, path: '/doctor/lab-results', roles: ['doctor'] },
-  { label: 'Prescriptions', icon: Pill, path: '/prescriptions', roles: ['admin', 'doctor', 'pharmacist'] },
-  { label: 'Pharmacy', icon: Pill, path: '/pharmacy', roles: ['admin', 'pharmacist'] },
-  { label: 'Pre-Operative', icon: ClipboardList, path: '/pre-operative', roles: ['admin', 'doctor', 'nurse'] },
-  { label: 'Intra-Operative', icon: Syringe, path: '/intra-operative', roles: ['admin', 'doctor', 'nurse'] },
-  { label: 'Post-Operative', icon: BedDouble, path: '/post-operative', roles: ['admin', 'doctor', 'nurse'] },
-  { label: 'ICU', icon: BedDouble, path: '/icu', roles: ['admin', 'doctor', 'nurse'] },
-  { label: 'Follow-ups', icon: Heart, path: '/follow-ups', roles: ['admin', 'doctor', 'nurse'] },
-  { label: 'Reports', icon: BarChart3, path: '/reports', roles: ['admin', 'doctor', 'nurse'] },
-  { label: 'User Management', icon: Shield, path: '/admin/users', roles: ['admin'] },
-  { label: 'Settings', icon: Settings, path: '/settings', roles: ['admin'] },
+  { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', roles: ['admin', 'nurse', 'doctor', 'lab_technician', 'pharmacist'], moduleKey: 'dashboard' },
+  { label: 'Patients', icon: Users, path: '/patients', roles: ['admin', 'nurse', 'doctor'], moduleKey: 'patients' },
+  { label: 'Register Patient', icon: UserPlus, path: '/patients/register', roles: ['admin', 'nurse'], moduleKey: 'patients' },
+  { label: 'Vitals', icon: Activity, path: '/vitals', roles: ['admin', 'nurse'], moduleKey: 'vitals' },
+  { label: 'Appointments', icon: Calendar, path: '/appointments', roles: ['admin', 'nurse', 'doctor'], moduleKey: 'appointments' },
+  { label: 'My Patients', icon: Stethoscope, path: '/doctor/patients', roles: ['doctor'], moduleKey: 'consultation' },
+  { label: 'Consultation', icon: Stethoscope, path: '/doctor/consultation', roles: ['doctor', 'admin'], moduleKey: 'consultation' },
+  { label: 'My Schedule', icon: Clock, path: '/doctor/schedule', roles: ['doctor'], moduleKey: 'appointments' },
+  { label: 'Lab Orders', icon: FlaskConical, path: '/lab/orders', roles: ['admin', 'doctor', 'lab_technician'], moduleKey: 'lab_orders' },
+  { label: 'Lab Results', icon: ClipboardList, path: '/lab/results', roles: ['admin', 'lab_technician'], moduleKey: 'lab_results' },
+  { label: 'Lab Results', icon: ClipboardList, path: '/doctor/lab-results', roles: ['doctor'], moduleKey: 'lab_results' },
+  { label: 'Prescriptions', icon: Pill, path: '/prescriptions', roles: ['admin', 'doctor', 'pharmacist'], moduleKey: 'prescriptions' },
+  { label: 'Pharmacy', icon: Pill, path: '/pharmacy', roles: ['admin', 'pharmacist'], moduleKey: 'pharmacy' },
+  { label: 'Pre-Operative', icon: ClipboardList, path: '/pre-operative', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'pre_operative' },
+  { label: 'Intra-Operative', icon: Syringe, path: '/intra-operative', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'intra_operative' },
+  { label: 'Post-Operative', icon: BedDouble, path: '/post-operative', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'post_operative' },
+  { label: 'ICU', icon: BedDouble, path: '/icu', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'icu' },
+  { label: 'Follow-ups', icon: Heart, path: '/follow-ups', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'follow_ups' },
+  { label: 'Reports', icon: BarChart3, path: '/reports', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'reports' },
+  { label: 'User Management', icon: Shield, path: '/admin/users', roles: ['admin'] }, // Always visible for admin
+  { label: 'Settings', icon: Settings, path: '/settings', roles: ['admin'] }, // Always visible for admin
 ];
-
 // Sidebar context for collapsed state
 interface SidebarContextValue {
   collapsed: boolean;
@@ -78,11 +78,15 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { role } = useAuth();
   const { settings } = useSettings();
   const location = useLocation();
+  const enabledModules = settings?.enabled_modules || {};
 
-  const filteredItems = navItems.filter(item => 
-    role && item.roles.includes(role)
-  );
-
+  const filteredItems = navItems.filter(item => {
+    // Check role access
+    if (!role || !item.roles.includes(role)) return false;
+    // Check if module is enabled (items without moduleKey are always shown)
+    if (item.moduleKey && enabledModules[item.moduleKey] === false) return false;
+    return true;
+  });
   return (
     <div className="flex flex-col h-full">
       {/* Logo */}
@@ -132,11 +136,15 @@ function DesktopSidebar({ collapsed, setCollapsed }: { collapsed: boolean; setCo
   const { role } = useAuth();
   const { settings } = useSettings();
   const location = useLocation();
+  const enabledModules = settings?.enabled_modules || {};
 
-  const filteredItems = navItems.filter(item => 
-    role && item.roles.includes(role)
-  );
-
+  const filteredItems = navItems.filter(item => {
+    // Check role access
+    if (!role || !item.roles.includes(role)) return false;
+    // Check if module is enabled (items without moduleKey are always shown)
+    if (item.moduleKey && enabledModules[item.moduleKey] === false) return false;
+    return true;
+  });
   return (
     <aside
       className={cn(
