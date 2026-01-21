@@ -17,10 +17,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const fetchSettings = async () => {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('system_settings')
         .select('*')
         .single();
+      
+      if (error) {
+        console.error('Error fetching settings:', error);
+      }
       
       if (data) {
         setSettings(data as unknown as SystemSettings);

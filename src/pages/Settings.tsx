@@ -79,9 +79,19 @@ export default function Settings() {
 
   const updateSettingsMutation = useMutation({
     mutationFn: async () => {
-      if (!settings?.id) {
-        throw new Error('Settings not found');
+      // Get the current settings from database directly if context is stale
+      let settingsId = settings?.id;
+      if (!settingsId) {
+        const { data: currentSettings, error: fetchError } = await supabase
+          .from('system_settings')
+          .select('id')
+          .single();
+        if (fetchError || !currentSettings) {
+          throw new Error('Could not find settings. Please refresh the page.');
+        }
+        settingsId = currentSettings.id;
       }
+      
       const { error } = await supabase
         .from('system_settings')
         .update({
@@ -90,7 +100,7 @@ export default function Settings() {
           theme,
           enabled_modules: enabledModules as unknown as Record<string, boolean>,
         })
-        .eq('id', settings.id);
+        .eq('id', settingsId);
       if (error) throw error;
     },
     onSuccess: () => {
