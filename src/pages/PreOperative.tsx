@@ -18,7 +18,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Plus, ClipboardCheck, Search, CalendarIcon, Stethoscope, CheckCircle, AlertTriangle, Trash2, ArrowRight } from 'lucide-react';
+import { Plus, ClipboardCheck, Search, CalendarIcon, Stethoscope, CheckCircle, AlertTriangle, Trash2, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import type { Surgery, Patient } from '@/types/database';
 import { cn } from '@/lib/utils';
@@ -87,8 +87,8 @@ export default function PreOperative() {
       const { data, error } = await supabase
         .from('surgeries')
         .select('*, patient:patients(*)')
-        .in('status', ['scheduled', 'pre_op_complete'])
-        .order('scheduled_date', { ascending: true });
+        .in('status', ['scheduled', 'pre_op_complete', 'completed'])
+        .order('scheduled_date', { ascending: false });
       if (error) throw error;
       return data as (Surgery & { patient: Patient })[];
     },
@@ -280,6 +280,7 @@ export default function PreOperative() {
 
   const pendingSurgeries = filteredSurgeries?.filter(s => s.status === 'scheduled' && !s.who_checklist_completed);
   const readySurgeries = filteredSurgeries?.filter(s => s.who_checklist_completed && s.status === 'pre_op_complete');
+  const completedSurgeries = filteredSurgeries?.filter(s => s.status === 'completed');
 
   const availableProcedures = surgeryTypes.find((t) => t.type === surgeryType)?.procedures || [];
   const canSchedule = role === 'admin' || role === 'doctor';
@@ -300,7 +301,7 @@ export default function PreOperative() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Pending Checklist</CardTitle>
@@ -331,6 +332,16 @@ export default function PreOperative() {
             <p className="text-xs text-muted-foreground">From doctor consultations</p>
           </CardContent>
         </Card>
+        <Card className="border-green-500/30 bg-green-500/5">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-green-600">Completed</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{completedSurgeries?.length || 0}</div>
+            <p className="text-xs text-muted-foreground">Successfully completed surgeries</p>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -358,6 +369,13 @@ export default function PreOperative() {
               )}
             </TabsTrigger>
           )}
+          <TabsTrigger value="completed" className="gap-2">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            Completed
+            {completedSurgeries && completedSurgeries.length > 0 && (
+              <Badge className="ml-1 bg-green-600">{completedSurgeries.length}</Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {/* Pending Checklist Tab */}
@@ -563,6 +581,65 @@ export default function PreOperative() {
                           <Button size="sm" onClick={() => openScheduleFromReferral(referral)}>
                             <Plus className="h-4 w-4 mr-1" /> Schedule
                           </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Completed Surgeries Tab */}
+        <TabsContent value="completed">
+          <Card className="border-green-500/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-green-600">
+                <CheckCircle2 className="h-5 w-5" />
+                Completed Surgeries
+              </CardTitle>
+              <CardDescription>
+                Successfully completed surgical procedures
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {completedSurgeries?.length === 0 ? (
+                <div className="text-center py-8">
+                  <CheckCircle2 className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                  <p className="mt-2 text-muted-foreground">No completed surgeries</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Patient</TableHead>
+                      <TableHead>Procedure</TableHead>
+                      <TableHead>Surgery Date</TableHead>
+                      <TableHead>Operating Room</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {completedSurgeries?.map((surgery) => (
+                      <TableRow key={surgery.id} className="bg-green-500/5">
+                        <TableCell className="font-medium">
+                          {surgery.patient?.first_name} {surgery.patient?.last_name}
+                          <div className="text-xs text-muted-foreground">{surgery.patient?.patient_number}</div>
+                        </TableCell>
+                        <TableCell>
+                          {surgery.surgery_name}
+                          <div className="text-xs text-muted-foreground capitalize">{surgery.surgery_type}</div>
+                        </TableCell>
+                        <TableCell>
+                          {format(new Date(surgery.scheduled_date), 'MMM d, yyyy')}
+                          <div className="text-xs text-muted-foreground">{surgery.scheduled_time}</div>
+                        </TableCell>
+                        <TableCell>{surgery.operating_room || '-'}</TableCell>
+                        <TableCell>
+                          <Badge className="bg-green-600 hover:bg-green-700 gap-1">
+                            <CheckCircle2 className="h-3 w-3" /> Completed
+                          </Badge>
                         </TableCell>
                       </TableRow>
                     ))}
