@@ -16,8 +16,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { toast } from 'sonner';
 import { format, differenceInYears } from 'date-fns';
+import { cn } from '@/lib/utils';
 import { 
   Stethoscope, Search, ClipboardList, FlaskConical, 
   FileText, Activity, Pill, Syringe, AlertTriangle,
@@ -87,6 +90,10 @@ export default function DoctorConsultationPage() {
   const [surgeryForm, setSurgeryForm] = useState({
     surgeryName: '',
     surgeryType: '',
+    scheduledDate: undefined as Date | undefined,
+    scheduledTime: '',
+    durationMinutes: '120',
+    operatingRoom: '',
     reason: '',
     notes: '',
   });
@@ -233,14 +240,18 @@ export default function DoctorConsultationPage() {
   const createSurgeryMutation = useMutation({
     mutationFn: async () => {
       if (!selectedPatient) throw new Error('No patient selected');
+      if (!surgeryForm.scheduledDate) throw new Error('Please select a surgery date');
+      if (!surgeryForm.scheduledTime) throw new Error('Please select a surgery time');
 
       const { error } = await supabase.from('surgeries').insert({
         patient_id: selectedPatient.id,
         surgeon_id: user?.id,
         surgery_name: surgeryForm.surgeryName,
         surgery_type: surgeryForm.surgeryType,
-        scheduled_date: format(new Date(), 'yyyy-MM-dd'),
-        scheduled_time: '09:00',
+        scheduled_date: format(surgeryForm.scheduledDate, 'yyyy-MM-dd'),
+        scheduled_time: surgeryForm.scheduledTime,
+        duration_minutes: parseInt(surgeryForm.durationMinutes) || 120,
+        operating_room: surgeryForm.operatingRoom || null,
         pre_op_assessment: surgeryForm.reason,
         status: 'scheduled',
       });
@@ -938,62 +949,185 @@ export default function DoctorConsultationPage() {
 
       {/* Surgery Referral Dialog */}
       <Dialog open={surgeryDialogOpen} onOpenChange={setSurgeryDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Surgery Referral</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Syringe className="h-5 w-5 text-primary" />
+              Surgery Scheduling
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Surgery Name *</Label>
-              <Input
-                value={surgeryForm.surgeryName}
-                onChange={(e) => setSurgeryForm(prev => ({ ...prev, surgeryName: e.target.value }))}
-                placeholder="e.g., Coronary Bypass Surgery"
-              />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Left Column - Surgery Details */}
+            <div className="space-y-4">
+              <div>
+                <Label>Surgery Name *</Label>
+                <Input
+                  value={surgeryForm.surgeryName}
+                  onChange={(e) => setSurgeryForm(prev => ({ ...prev, surgeryName: e.target.value }))}
+                  placeholder="e.g., Coronary Bypass Surgery"
+                />
+              </div>
+              <div>
+                <Label>Surgery Type *</Label>
+                <Select 
+                  value={surgeryForm.surgeryType} 
+                  onValueChange={(v) => setSurgeryForm(prev => ({ ...prev, surgeryType: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cardiac">Cardiac Surgery</SelectItem>
+                    <SelectItem value="vascular">Vascular Surgery</SelectItem>
+                    <SelectItem value="interventional">Interventional Procedure</SelectItem>
+                    <SelectItem value="diagnostic">Diagnostic Procedure</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Reason for Surgery *</Label>
+                <Textarea
+                  value={surgeryForm.reason}
+                  onChange={(e) => setSurgeryForm(prev => ({ ...prev, reason: e.target.value }))}
+                  placeholder="Clinical justification for surgical intervention..."
+                  rows={3}
+                />
+              </div>
+              <div>
+                <Label>Additional Notes</Label>
+                <Textarea
+                  value={surgeryForm.notes}
+                  onChange={(e) => setSurgeryForm(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Notes for surgical team..."
+                  rows={2}
+                />
+              </div>
             </div>
-            <div>
-              <Label>Surgery Type *</Label>
-              <Select 
-                value={surgeryForm.surgeryType} 
-                onValueChange={(v) => setSurgeryForm(prev => ({ ...prev, surgeryType: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cardiac">Cardiac Surgery</SelectItem>
-                  <SelectItem value="vascular">Vascular Surgery</SelectItem>
-                  <SelectItem value="interventional">Interventional Procedure</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Reason for Surgery *</Label>
-              <Textarea
-                value={surgeryForm.reason}
-                onChange={(e) => setSurgeryForm(prev => ({ ...prev, reason: e.target.value }))}
-                placeholder="Clinical justification for surgical intervention..."
-                rows={3}
-              />
-            </div>
-            <div>
-              <Label>Additional Notes</Label>
-              <Textarea
-                value={surgeryForm.notes}
-                onChange={(e) => setSurgeryForm(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Notes for surgical team..."
-                rows={2}
-              />
+
+            {/* Right Column - Scheduling */}
+            <div className="space-y-4">
+              <div>
+                <Label>Surgery Date *</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !surgeryForm.scheduledDate && "text-muted-foreground"
+                      )}
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {surgeryForm.scheduledDate ? format(surgeryForm.scheduledDate, "PPP") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={surgeryForm.scheduledDate}
+                      onSelect={(date) => setSurgeryForm(prev => ({ ...prev, scheduledDate: date }))}
+                      disabled={(date) => date < new Date()}
+                      initialFocus
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div>
+                <Label>Surgery Time *</Label>
+                <Select 
+                  value={surgeryForm.scheduledTime} 
+                  onValueChange={(v) => setSurgeryForm(prev => ({ ...prev, scheduledTime: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="06:00">06:00 AM</SelectItem>
+                    <SelectItem value="07:00">07:00 AM</SelectItem>
+                    <SelectItem value="08:00">08:00 AM</SelectItem>
+                    <SelectItem value="09:00">09:00 AM</SelectItem>
+                    <SelectItem value="10:00">10:00 AM</SelectItem>
+                    <SelectItem value="11:00">11:00 AM</SelectItem>
+                    <SelectItem value="12:00">12:00 PM</SelectItem>
+                    <SelectItem value="13:00">01:00 PM</SelectItem>
+                    <SelectItem value="14:00">02:00 PM</SelectItem>
+                    <SelectItem value="15:00">03:00 PM</SelectItem>
+                    <SelectItem value="16:00">04:00 PM</SelectItem>
+                    <SelectItem value="17:00">05:00 PM</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Estimated Duration</Label>
+                <Select 
+                  value={surgeryForm.durationMinutes} 
+                  onValueChange={(v) => setSurgeryForm(prev => ({ ...prev, durationMinutes: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="60">1 hour</SelectItem>
+                    <SelectItem value="90">1.5 hours</SelectItem>
+                    <SelectItem value="120">2 hours</SelectItem>
+                    <SelectItem value="180">3 hours</SelectItem>
+                    <SelectItem value="240">4 hours</SelectItem>
+                    <SelectItem value="300">5 hours</SelectItem>
+                    <SelectItem value="360">6 hours</SelectItem>
+                    <SelectItem value="480">8 hours</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Operating Room</Label>
+                <Select 
+                  value={surgeryForm.operatingRoom} 
+                  onValueChange={(v) => setSurgeryForm(prev => ({ ...prev, operatingRoom: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Assign OR (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="OR-1">OR-1 (Cardiac)</SelectItem>
+                    <SelectItem value="OR-2">OR-2 (Cardiac)</SelectItem>
+                    <SelectItem value="OR-3">OR-3 (Vascular)</SelectItem>
+                    <SelectItem value="OR-4">OR-4 (General)</SelectItem>
+                    <SelectItem value="CATH-1">Cath Lab 1</SelectItem>
+                    <SelectItem value="CATH-2">Cath Lab 2</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Patient Summary */}
+              {selectedPatient && (
+                <div className="p-3 bg-muted rounded-lg mt-2">
+                  <p className="text-sm font-medium">Patient</p>
+                  <p className="text-lg font-bold">{selectedPatient.first_name} {selectedPatient.last_name}</p>
+                  <p className="text-xs text-muted-foreground">{selectedPatient.patient_number}</p>
+                  {selectedPatient.blood_type && (
+                    <Badge variant="outline" className="mt-1 gap-1">
+                      <Heart className="h-3 w-3" /> {selectedPatient.blood_type}
+                    </Badge>
+                  )}
+                </div>
+              )}
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => setSurgeryDialogOpen(false)}>Cancel</Button>
             <Button 
               onClick={() => createSurgeryMutation.mutate()}
-              disabled={!surgeryForm.surgeryName || !surgeryForm.surgeryType || !surgeryForm.reason || createSurgeryMutation.isPending}
+              disabled={!surgeryForm.surgeryName || !surgeryForm.surgeryType || !surgeryForm.reason || !surgeryForm.scheduledDate || !surgeryForm.scheduledTime || createSurgeryMutation.isPending}
+              className="gap-2"
             >
-              {createSurgeryMutation.isPending ? 'Scheduling...' : 'Schedule Surgery'}
+              {createSurgeryMutation.isPending ? 'Scheduling...' : (
+                <>
+                  <Calendar className="h-4 w-4" />
+                  Schedule Surgery
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Notification } from '@/types/database';
+import { soundManager } from '@/lib/sounds';
 
 export function useNotifications() {
   const { user } = useAuth();
@@ -42,7 +43,15 @@ export function useNotifications() {
           filter: `user_id=eq.${user?.id}`,
         },
         (payload) => {
-          setNotifications(prev => [payload.new as Notification, ...prev]);
+          const notification = payload.new as Notification;
+          setNotifications(prev => [notification, ...prev]);
+          
+          // Play notification sound based on type
+          if (notification.type === 'urgent' || notification.type === 'alert') {
+            soundManager.playAlert();
+          } else {
+            soundManager.playNotification();
+          }
         }
       )
       .subscribe();

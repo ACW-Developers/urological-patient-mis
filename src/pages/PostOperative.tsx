@@ -12,11 +12,13 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Search, FileEdit, CheckCircle, BedDouble, ClipboardList, ArrowRight, Trash2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import type { Surgery, Patient } from '@/types/database';
+import { soundManager } from '@/lib/sounds';
 
 // WHO Sign-Out Checklist (Before patient leaves operating room)
 const signOutChecklistItems = [
@@ -27,6 +29,9 @@ const signOutChecklistItems = [
   'Key concerns for recovery and management of patient reviewed by surgeon, anesthetist, and nurse',
 ];
 
+// Available ICU/CCU beds
+const icuBeds = ['ICU-1', 'ICU-2', 'ICU-3', 'ICU-4', 'ICU-5', 'ICU-6', 'CCU-1', 'CCU-2', 'CCU-3', 'CCU-4'];
+
 export default function PostOperative() {
   const navigate = useNavigate();
   const { user, role } = useAuth();
@@ -34,10 +39,12 @@ export default function PostOperative() {
   const [searchTerm, setSearchTerm] = useState('');
   const [signOutDialogOpen, setSignOutDialogOpen] = useState(false);
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
+  const [icuTransferDialogOpen, setIcuTransferDialogOpen] = useState(false);
   const [selectedSurgery, setSelectedSurgery] = useState<(Surgery & { patient: Patient }) | null>(null);
   const [signOutChecked, setSignOutChecked] = useState<boolean[]>(new Array(signOutChecklistItems.length).fill(false));
   const [postOpNotes, setPostOpNotes] = useState('');
   const [recoveryStatus, setRecoveryStatus] = useState('');
+  const [selectedBed, setSelectedBed] = useState('');
 
   const { data: surgeries, isLoading } = useQuery({
     queryKey: ['postop-surgeries'],
@@ -52,6 +59,22 @@ export default function PostOperative() {
     },
   });
 
+  // Fetch current ICU admissions to determine occupied beds
+  const { data: currentIcuAdmissions } = useQuery({
+    queryKey: ['current-icu-beds'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('icu_admissions')
+        .select('bed_number')
+        .eq('status', 'admitted');
+      if (error) return [];
+      return data;
+    },
+  });
+
+  const occupiedBeds = currentIcuAdmissions?.map(a => a.bed_number) || [];
+  const availableBeds = icuBeds.filter(b => !occupiedBeds.includes(b));
+
   const updateSurgeryMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Record<string, unknown> }) => {
       const { error } = await supabase.from('surgeries').update(updates).eq('id', id);
@@ -60,25 +83,27 @@ export default function PostOperative() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['postop-surgeries'] });
       toast.success('Updated successfully');
+      soundManager.playSuccess();
       setSignOutDialogOpen(false);
       setNotesDialogOpen(false);
       setSelectedSurgery(null);
     },
     onError: (error: Error) => {
       toast.error(error.message);
+      soundManager.playError();
     },
   });
 
   const admitToICUMutation = useMutation({
-    mutationFn: async (surgery: Surgery & { patient: Patient }) => {
-      // Create ICU admission
+    mutationFn: async ({ surgery, bedNumber }: { surgery: Surgery & { patient: Patient }; bedNumber: string }) => {
+      // Create ICU admission with bed assignment
       const { error: icuError } = await supabase.from('icu_admissions').insert({
         patient_id: surgery.patient_id,
         surgery_id: surgery.id,
         admitted_by: user?.id,
-        bed_number: null,
+        bed_number: bedNumber,
         admission_reason: `Post-surgery recovery: ${surgery.surgery_name}`,
-        status: 'active',
+        status: 'admitted',
       });
       if (icuError) throw icuError;
 
@@ -92,11 +117,16 @@ export default function PostOperative() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['postop-surgeries'] });
       queryClient.invalidateQueries({ queryKey: ['icu-admissions'] });
+      queryClient.invalidateQueries({ queryKey: ['current-icu-beds'] });
       toast.success('Patient admitted to ICU for monitoring');
+      soundManager.playSuccess();
+      setIcuTransferDialogOpen(false);
+      setSelectedBed('');
       navigate('/icu');
     },
     onError: (error: Error) => {
       toast.error(error.message);
+      soundManager.playError();
     },
   });
 
@@ -348,7 +378,7 @@ export default function PostOperative() {
                         <Button size="sm" variant="outline" onClick={() => openNotesDialog(surgery)}>
                           <FileEdit className="h-4 w-4 mr-1" /> Notes
                         </Button>
-                        <Button size="sm" onClick={() => admitToICUMutation.mutate(surgery)} disabled={admitToICUMutation.isPending} className="gap-1">
+                        <Button size="sm" onClick={() => { setSelectedSurgery(surgery); setIcuTransferDialogOpen(true); soundManager.playDialogOpen(); }} className="gap-1">
                           <BedDouble className="h-4 w-4" /> Transfer to ICU <ArrowRight className="h-4 w-4" />
                         </Button>
                       </div>
@@ -458,6 +488,63 @@ export default function PostOperative() {
               </Button>
               <Button onClick={savePostOpNotes} disabled={updateSurgeryMutation.isPending}>
                 Save Notes
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ICU Transfer Dialog */}
+      <Dialog open={icuTransferDialogOpen} onOpenChange={setIcuTransferDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BedDouble className="h-5 w-5 text-primary" />
+              Transfer to ICU
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-3 bg-muted rounded-lg">
+              <p className="font-medium">{selectedSurgery?.patient?.first_name} {selectedSurgery?.patient?.last_name}</p>
+              <p className="text-sm text-muted-foreground">{selectedSurgery?.surgery_name}</p>
+            </div>
+
+            <div>
+              <Label>Assign ICU/CCU Bed *</Label>
+              <Select value={selectedBed} onValueChange={setSelectedBed}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select available bed" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableBeds.length === 0 ? (
+                    <SelectItem value="none" disabled>No beds available</SelectItem>
+                  ) : (
+                    availableBeds.map((bed) => (
+                      <SelectItem key={bed} value={bed}>{bed}</SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                {availableBeds.length} beds available out of {icuBeds.length}
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setIcuTransferDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                className="flex-1 gap-2"
+                onClick={() => selectedSurgery && admitToICUMutation.mutate({ surgery: selectedSurgery, bedNumber: selectedBed })}
+                disabled={!selectedBed || admitToICUMutation.isPending}
+              >
+                {admitToICUMutation.isPending ? 'Transferring...' : (
+                  <>
+                    <ArrowRight className="h-4 w-4" />
+                    Confirm Transfer
+                  </>
+                )}
               </Button>
             </div>
           </div>

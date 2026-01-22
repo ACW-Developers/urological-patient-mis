@@ -18,10 +18,12 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Plus, ClipboardCheck, Search, CalendarIcon, Stethoscope, CheckCircle, AlertTriangle, Trash2, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Plus, ClipboardCheck, Search, CalendarIcon, Stethoscope, CheckCircle, AlertTriangle, Trash2, ArrowRight, CheckCircle2, User } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import type { Surgery, Patient } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { PatientVerificationPanel } from '@/components/preoperative/PatientVerificationPanel';
+import { soundManager } from '@/lib/sounds';
 
 const surgeryTypes = [
   { type: 'cardiac', procedures: ['Coronary Artery Bypass', 'Valve Replacement', 'Heart Transplant', 'Angioplasty', 'Pacemaker Implant'] },
@@ -778,82 +780,149 @@ export default function PreOperative() {
         </DialogContent>
       </Dialog>
 
-      {/* WHO Checklist Dialog */}
+      {/* WHO Checklist Dialog - Redesigned */}
       <Dialog open={checklistDialogOpen} onOpenChange={setChecklistDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden">
           <DialogHeader>
-            <DialogTitle>WHO Surgical Safety Checklist</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardCheck className="h-5 w-5 text-primary" />
+              Pre-Operative Verification & WHO Safety Checklist
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-6">
-            <div className="p-3 bg-muted rounded-lg">
-              <p className="font-medium">{selectedSurgery?.patient?.first_name} {selectedSurgery?.patient?.last_name}</p>
-              <p className="text-sm text-muted-foreground">{selectedSurgery?.surgery_name} - {selectedSurgery?.operating_room}</p>
-            </div>
+          
+          {selectedSurgery?.patient && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Left Column - Patient Verification Panel */}
+              <div className="border-r pr-4">
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Patient Verification
+                </h3>
+                <PatientVerificationPanel 
+                  patient={selectedSurgery.patient}
+                  surgeryName={selectedSurgery.surgery_name}
+                  scheduledDate={selectedSurgery.scheduled_date}
+                />
+              </div>
 
-            {/* Sign-In Checklist */}
-            <div>
-              <h3 className="font-semibold mb-3 flex items-center gap-2">
-                <Badge variant="outline">SIGN IN</Badge>
-                Before Induction of Anesthesia
-              </h3>
-              <div className="space-y-2">
-                {signInChecklistItems.map((item, index) => (
-                  <div key={index} className="flex items-start space-x-3 p-2 hover:bg-muted/50 rounded">
-                    <Checkbox
-                      id={`signin-${index}`}
-                      checked={signInChecked[index]}
-                      onCheckedChange={(checked) => {
-                        const updated = [...signInChecked];
-                        updated[index] = !!checked;
-                        setSignInChecked(updated);
-                      }}
-                    />
-                    <Label htmlFor={`signin-${index}`} className="cursor-pointer flex-1 text-sm">
-                      {item}
-                    </Label>
-                  </div>
-                ))}
+              {/* Right Column - WHO Checklists */}
+              <div className="space-y-4 overflow-y-auto max-h-[60vh] pr-2">
+                {/* Sign-In Summary Card */}
+                <Card className={signInChecked.every(Boolean) ? 'border-green-500/50 bg-green-500/5' : ''}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={signInChecked.every(Boolean) ? 'default' : 'outline'}>
+                          SIGN IN
+                        </Badge>
+                        Before Anesthesia
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {signInChecked.filter(Boolean).length}/{signInChecklistItems.length}
+                      </span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-1">
+                    {signInChecklistItems.map((item, index) => (
+                      <div 
+                        key={index} 
+                        className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
+                          signInChecked[index] ? 'bg-green-500/10' : 'hover:bg-muted/50'
+                        }`}
+                        onClick={() => {
+                          const updated = [...signInChecked];
+                          updated[index] = !updated[index];
+                          setSignInChecked(updated);
+                          if (!signInChecked[index]) soundManager.playClick();
+                        }}
+                      >
+                        <Checkbox
+                          id={`signin-${index}`}
+                          checked={signInChecked[index]}
+                          onCheckedChange={(checked) => {
+                            const updated = [...signInChecked];
+                            updated[index] = !!checked;
+                            setSignInChecked(updated);
+                            if (checked) soundManager.playClick();
+                          }}
+                        />
+                        <Label htmlFor={`signin-${index}`} className="cursor-pointer flex-1 text-xs leading-tight">
+                          {item}
+                        </Label>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                {/* Time-Out Summary Card */}
+                <Card className={timeOutChecked.every(Boolean) ? 'border-green-500/50 bg-green-500/5' : ''}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={timeOutChecked.every(Boolean) ? 'default' : 'outline'}>
+                          TIME OUT
+                        </Badge>
+                        Before Incision
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {timeOutChecked.filter(Boolean).length}/{timeOutChecklistItems.length}
+                      </span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-1">
+                    {timeOutChecklistItems.map((item, index) => (
+                      <div 
+                        key={index} 
+                        className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
+                          timeOutChecked[index] ? 'bg-green-500/10' : 'hover:bg-muted/50'
+                        }`}
+                        onClick={() => {
+                          const updated = [...timeOutChecked];
+                          updated[index] = !updated[index];
+                          setTimeOutChecked(updated);
+                          if (!timeOutChecked[index]) soundManager.playClick();
+                        }}
+                      >
+                        <Checkbox
+                          id={`timeout-${index}`}
+                          checked={timeOutChecked[index]}
+                          onCheckedChange={(checked) => {
+                            const updated = [...timeOutChecked];
+                            updated[index] = !!checked;
+                            setTimeOutChecked(updated);
+                            if (checked) soundManager.playClick();
+                          }}
+                        />
+                        <Label htmlFor={`timeout-${index}`} className="cursor-pointer flex-1 text-xs leading-tight">
+                          {item}
+                        </Label>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
               </div>
             </div>
+          )}
 
-            {/* Time-Out Checklist */}
-            <div>
-              <h3 className="font-semibold mb-3 flex items-center gap-2">
-                <Badge variant="outline">TIME OUT</Badge>
-                Before Skin Incision
-              </h3>
-              <div className="space-y-2">
-                {timeOutChecklistItems.map((item, index) => (
-                  <div key={index} className="flex items-start space-x-3 p-2 hover:bg-muted/50 rounded">
-                    <Checkbox
-                      id={`timeout-${index}`}
-                      checked={timeOutChecked[index]}
-                      onCheckedChange={(checked) => {
-                        const updated = [...timeOutChecked];
-                        updated[index] = !!checked;
-                        setTimeOutChecked(updated);
-                      }}
-                    />
-                    <Label htmlFor={`timeout-${index}`} className="cursor-pointer flex-1 text-sm">
-                      {item}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setChecklistDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={completePreOpChecklist}
-                disabled={!signInChecked.every(Boolean) || !timeOutChecked.every(Boolean) || updateSurgeryMutation.isPending}
-              >
-                {updateSurgeryMutation.isPending ? 'Saving...' : 'Complete Pre-Op Checklist'}
-              </Button>
-            </div>
+          <div className="flex gap-2 mt-4 pt-4 border-t">
+            <Button variant="outline" className="flex-1" onClick={() => setChecklistDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="flex-1 gap-2"
+              onClick={() => {
+                completePreOpChecklist();
+                soundManager.playSuccess();
+              }}
+              disabled={!signInChecked.every(Boolean) || !timeOutChecked.every(Boolean) || updateSurgeryMutation.isPending}
+            >
+              {updateSurgeryMutation.isPending ? 'Saving...' : (
+                <>
+                  <CheckCircle className="h-4 w-4" />
+                  Complete Pre-Op & Proceed
+                </>
+              )}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
