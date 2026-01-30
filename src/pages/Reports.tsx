@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +37,7 @@ const reportTypes: { value: ReportType; label: string; icon: React.ElementType; 
 
 export default function Reports() {
   const { settings } = useSettings();
+  const { user } = useAuth();
   const [selectedReport, setSelectedReport] = useState<ReportType>('research');
   const [startDate, setStartDate] = useState<string>(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -530,7 +532,31 @@ export default function Reports() {
         );
       }
 
-      doc.save(`${selectedReport}-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      const filename = `${selectedReport}-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+      doc.save(filename);
+      
+      // Track download in database
+      if (user?.id) {
+        const reportConfig = reportTypes.find(r => r.value === selectedReport);
+        const documentType = selectedReport === 'research' ? 'research_report' : 
+                            selectedReport === 'vitals' ? 'vitals_report' :
+                            selectedReport === 'surgeries' ? 'surgery_report' :
+                            selectedReport === 'lab_tests' ? 'lab_report' :
+                            'patient_report';
+        
+        await supabase.from('downloads').insert({
+          user_id: user.id,
+          document_type: documentType,
+          document_name: reportConfig?.label || filename,
+          file_format: 'pdf',
+          metadata: {
+            report_type: selectedReport,
+            date_range: { start: startDate, end: endDate },
+            generated_at: new Date().toISOString(),
+          }
+        });
+      }
+      
       toast.success('Report generated successfully');
     } catch (error) {
       console.error('Error generating PDF:', error);

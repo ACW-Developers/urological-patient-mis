@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -106,6 +107,7 @@ const fieldGroups: FieldGroup[] = [
 const allFields = fieldGroups.flatMap(g => g.fields);
 
 export default function PatientExcelExport() {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [selectedFields, setSelectedFields] = useState<string[]>(allFields.map(f => f.key));
   const [selectedPatient, setSelectedPatient] = useState<string>('all');
@@ -260,6 +262,22 @@ export default function PatientExcelExport() {
       // Generate filename with timestamp
       const filename = `patient-export-${format(new Date(), 'yyyy-MM-dd-HHmm')}.xlsx`;
       XLSX.writeFile(wb, filename);
+      
+      // Track download in database
+      if (user?.id) {
+        await supabase.from('downloads').insert({
+          user_id: user.id,
+          document_type: 'excel_export',
+          document_name: `Patient Export (${exportData.length} patients)`,
+          file_format: 'xlsx',
+          metadata: {
+            patient_count: exportData.length,
+            selected_fields: selectedFields,
+            selected_patient: selectedPatient,
+            generated_at: new Date().toISOString(),
+          }
+        });
+      }
       
       toast.success(`Exported ${exportData.length} patient(s) to Excel`);
       setOpen(false);
