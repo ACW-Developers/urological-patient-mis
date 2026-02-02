@@ -50,22 +50,26 @@ const navItems: NavItem[] = [
   { label: 'My Patients', icon: Stethoscope, path: '/doctor/patients', roles: ['doctor'], moduleKey: 'consultation' },
   { label: 'Consultation', icon: Stethoscope, path: '/doctor/consultation', roles: ['doctor', 'admin'], moduleKey: 'consultation' },
   { label: 'My Schedule', icon: Clock, path: '/doctor/schedule', roles: ['doctor'], moduleKey: 'appointments' },
+  // Lab technician modules
   { label: 'Lab Orders', icon: FlaskConical, path: '/lab/orders', roles: ['admin', 'doctor', 'lab_technician'], moduleKey: 'lab_orders' },
   { label: 'Lab Results', icon: ClipboardList, path: '/lab/results', roles: ['admin', 'lab_technician'], moduleKey: 'lab_results' },
   { label: 'Lab Results', icon: ClipboardList, path: '/doctor/lab-results', roles: ['doctor'], moduleKey: 'lab_results' },
+  // Pharmacist modules
   { label: 'Prescriptions', icon: Pill, path: '/prescriptions', roles: ['admin', 'doctor', 'pharmacist'], moduleKey: 'prescriptions' },
   { label: 'Pharmacy', icon: Pill, path: '/pharmacy', roles: ['admin', 'pharmacist'], moduleKey: 'pharmacy' },
+  { label: 'Dispensing History', icon: ClipboardList, path: '/pharmacy/history', roles: ['pharmacist'], moduleKey: 'pharmacy' },
+  // Surgery modules
   { label: 'Pre-Operative', icon: ClipboardList, path: '/pre-operative', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'pre_operative' },
   { label: 'Intra-Operative', icon: Syringe, path: '/intra-operative', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'intra_operative' },
   { label: 'Post-Operative', icon: BedDouble, path: '/post-operative', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'post_operative' },
   { label: 'ICU', icon: BedDouble, path: '/icu', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'icu' },
   { label: 'Follow-ups', icon: Heart, path: '/follow-ups', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'follow_ups' },
-  { label: 'Reports', icon: BarChart3, path: '/reports', roles: ['admin', 'doctor', 'nurse', 'researcher'], moduleKey: 'reports' },
+  { label: 'Reports', icon: BarChart3, path: '/reports', roles: ['admin', 'doctor', 'nurse', 'researcher', 'lab_technician', 'pharmacist'], moduleKey: 'reports' },
   { label: 'Downloads', icon: Download, path: '/downloads', roles: ['researcher'], moduleKey: 'downloads' },
   { label: 'Activity Logs', icon: FileText, path: '/admin/logs', roles: ['admin'], moduleKey: 'activity_logs' },
-  { label: 'User Management', icon: Shield, path: '/admin/users', roles: ['admin'] }, // Always visible for admin
-  { label: 'Settings', icon: Settings, path: '/settings', roles: ['admin'] }, // Always visible for admin
-  { label: 'Settings', icon: Settings, path: '/researcher/settings', roles: ['researcher'] }, // Researcher settings
+  { label: 'User Management', icon: Shield, path: '/admin/users', roles: ['admin'] },
+  { label: 'Settings', icon: Settings, path: '/settings', roles: ['admin'] },
+  { label: 'Settings', icon: Settings, path: '/researcher/settings', roles: ['researcher'] },
 ];
 // Sidebar context for collapsed state
 interface SidebarContextValue {

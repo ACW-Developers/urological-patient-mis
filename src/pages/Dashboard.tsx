@@ -277,6 +277,12 @@ export default function Dashboard() {
                 <span className="text-xs sm:text-sm font-medium">Record Vitals</span>
               </a>
             )}
+            {role && ['admin', 'nurse'].includes(role) && (
+              <a href="/appointments" className="p-3 sm:p-4 rounded-xl bg-info/5 hover:bg-info/10 transition-colors text-center group">
+                <Calendar className="w-6 h-6 sm:w-8 sm:h-8 text-info mx-auto mb-1.5 sm:mb-2 group-hover:scale-110 transition-transform" />
+                <span className="text-xs sm:text-sm font-medium">Book Appointment</span>
+              </a>
+            )}
             {role && ['admin', 'doctor'].includes(role) && (
               <a href="/lab/orders" className="p-3 sm:p-4 rounded-xl bg-warning/5 hover:bg-warning/10 transition-colors text-center group">
                 <FlaskConical className="w-6 h-6 sm:w-8 sm:h-8 text-warning mx-auto mb-1.5 sm:mb-2 group-hover:scale-110 transition-transform" />
@@ -288,6 +294,36 @@ export default function Dashboard() {
                 <Pill className="w-6 h-6 sm:w-8 sm:h-8 text-info mx-auto mb-1.5 sm:mb-2 group-hover:scale-110 transition-transform" />
                 <span className="text-xs sm:text-sm font-medium">Write Prescription</span>
               </a>
+            )}
+            {/* Lab Technician Quick Actions */}
+            {role === 'lab_technician' && (
+              <>
+                <a href="/lab/orders" className="p-3 sm:p-4 rounded-xl bg-warning/5 hover:bg-warning/10 transition-colors text-center group">
+                  <FlaskConical className="w-6 h-6 sm:w-8 sm:h-8 text-warning mx-auto mb-1.5 sm:mb-2 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs sm:text-sm font-medium">View Lab Orders</span>
+                </a>
+                <a href="/lab/results" className="p-3 sm:p-4 rounded-xl bg-primary/5 hover:bg-primary/10 transition-colors text-center group">
+                  <Activity className="w-6 h-6 sm:w-8 sm:h-8 text-primary mx-auto mb-1.5 sm:mb-2 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs sm:text-sm font-medium">Enter Results</span>
+                </a>
+              </>
+            )}
+            {/* Pharmacist Quick Actions */}
+            {role === 'pharmacist' && (
+              <>
+                <a href="/pharmacy" className="p-3 sm:p-4 rounded-xl bg-info/5 hover:bg-info/10 transition-colors text-center group">
+                  <Pill className="w-6 h-6 sm:w-8 sm:h-8 text-info mx-auto mb-1.5 sm:mb-2 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs sm:text-sm font-medium">Dispense Meds</span>
+                </a>
+                <a href="/prescriptions" className="p-3 sm:p-4 rounded-xl bg-warning/5 hover:bg-warning/10 transition-colors text-center group">
+                  <FlaskConical className="w-6 h-6 sm:w-8 sm:h-8 text-warning mx-auto mb-1.5 sm:mb-2 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs sm:text-sm font-medium">View Prescriptions</span>
+                </a>
+                <a href="/pharmacy/history" className="p-3 sm:p-4 rounded-xl bg-success/5 hover:bg-success/10 transition-colors text-center group">
+                  <Activity className="w-6 h-6 sm:w-8 sm:h-8 text-success mx-auto mb-1.5 sm:mb-2 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs sm:text-sm font-medium">Dispensing History</span>
+                </a>
+              </>
             )}
           </div>
         </CardContent>

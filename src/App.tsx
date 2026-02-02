@@ -21,6 +21,7 @@ import LabResults from "./pages/LabResults";
 import DoctorLabResults from "./pages/DoctorLabResults";
 import Prescriptions from "./pages/Prescriptions";
 import Pharmacy from "./pages/Pharmacy";
+import PharmacyHistory from "./pages/PharmacyHistory";
 import PreOperative from "./pages/PreOperative";
 import IntraOperative from "./pages/IntraOperative";
 import PostOperative from "./pages/PostOperative";
@@ -90,6 +91,9 @@ const App = () => (
                   <Route path="/prescriptions" element={<Prescriptions />} />
                   <Route path="/pharmacy" element={
                     <ProtectedRoute allowedRoles={['admin', 'pharmacist']}><Pharmacy /></ProtectedRoute>
+                  } />
+                  <Route path="/pharmacy/history" element={
+                    <ProtectedRoute allowedRoles={['pharmacist', 'admin']}><PharmacyHistory /></ProtectedRoute>
                   } />
                   <Route path="/pre-operative" element={
                     <ProtectedRoute allowedRoles={['admin', 'doctor', 'nurse']}><PreOperative /></ProtectedRoute>
