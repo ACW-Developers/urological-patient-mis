@@ -19,7 +19,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { notifyDoctor } from '@/lib/notifications';
-
+import { soundManager } from '@/lib/sounds';
 interface DoctorSchedule {
   id: string;
   doctor_id: string;
@@ -381,12 +381,21 @@ export default function Appointments() {
       .eq('id', appointmentId);
 
     if (error) {
+      soundManager.playError();
       toast({
         title: 'Error',
         description: error.message,
         variant: 'destructive',
       });
     } else {
+      // Play success sound for complete action
+      if (status === 'completed') {
+        soundManager.playSuccess();
+      } else if (status === 'cancelled') {
+        soundManager.playAlert();
+      } else {
+        soundManager.playClick();
+      }
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       toast({
         title: 'Status Updated',
@@ -396,16 +405,25 @@ export default function Appointments() {
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, string> = {
-      scheduled: 'bg-info/10 text-info',
-      confirmed: 'bg-primary/10 text-primary',
-      completed: 'bg-success/10 text-success',
-      cancelled: 'bg-destructive/10 text-destructive',
-      'no-show': 'bg-warning/10 text-warning',
+    const badgeClasses: Record<string, string> = {
+      scheduled: 'badge-scheduled',
+      confirmed: 'badge-confirmed',
+      completed: 'badge-completed',
+      cancelled: 'badge-cancelled',
+      'no-show': 'badge-no-show',
     };
+    
+    const statusLabels: Record<string, string> = {
+      scheduled: '📅 Scheduled',
+      confirmed: '✓ Confirmed',
+      completed: '✔ Completed',
+      cancelled: '✗ Cancelled',
+      'no-show': '⚠ No-Show',
+    };
+    
     return (
-      <Badge className={variants[status] || variants.scheduled}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+      <Badge className={cn('badge-status', badgeClasses[status] || badgeClasses.scheduled)}>
+        {statusLabels[status] || status.charAt(0).toUpperCase() + status.slice(1)}
       </Badge>
     );
   };
