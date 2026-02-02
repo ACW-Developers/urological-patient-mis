@@ -25,6 +25,7 @@ import {
   Menu,
   Clock,
   Download,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -41,7 +42,8 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', roles: ['admin', 'nurse', 'doctor', 'lab_technician', 'pharmacist'], moduleKey: 'dashboard' },
   { label: 'Research Dashboard', icon: BarChart3, path: '/research-dashboard', roles: ['researcher'], moduleKey: 'dashboard' },
-  { label: 'Patients', icon: Users, path: '/patients', roles: ['admin', 'nurse', 'doctor', 'researcher'], moduleKey: 'patients' },
+  { label: 'Patient Data', icon: Users, path: '/patients', roles: ['researcher'], moduleKey: 'patients' },
+  { label: 'Patients', icon: Users, path: '/patients', roles: ['admin', 'nurse'], moduleKey: 'patients' },
   { label: 'Register Patient', icon: UserPlus, path: '/patients/register', roles: ['admin', 'nurse'], moduleKey: 'patients' },
   { label: 'Vitals', icon: Activity, path: '/vitals', roles: ['admin', 'nurse'], moduleKey: 'vitals' },
   { label: 'Appointments', icon: Calendar, path: '/appointments', roles: ['admin', 'nurse', 'doctor'], moduleKey: 'appointments' },
@@ -60,6 +62,7 @@ const navItems: NavItem[] = [
   { label: 'Follow-ups', icon: Heart, path: '/follow-ups', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'follow_ups' },
   { label: 'Reports', icon: BarChart3, path: '/reports', roles: ['admin', 'doctor', 'nurse', 'researcher'], moduleKey: 'reports' },
   { label: 'Downloads', icon: Download, path: '/downloads', roles: ['researcher'], moduleKey: 'downloads' },
+  { label: 'Activity Logs', icon: FileText, path: '/admin/logs', roles: ['admin'], moduleKey: 'activity_logs' },
   { label: 'User Management', icon: Shield, path: '/admin/users', roles: ['admin'] }, // Always visible for admin
   { label: 'Settings', icon: Settings, path: '/settings', roles: ['admin'] }, // Always visible for admin
   { label: 'Settings', icon: Settings, path: '/researcher/settings', roles: ['researcher'] }, // Researcher settings

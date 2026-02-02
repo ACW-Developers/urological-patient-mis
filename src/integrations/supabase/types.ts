@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          ip_address: string | null
+          page_path: string | null
+          session_duration_seconds: number | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          ip_address?: string | null
+          page_path?: string | null
+          session_duration_seconds?: number | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          ip_address?: string | null
+          page_path?: string | null
+          session_duration_seconds?: number | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       appointments: {
         Row: {
           appointment_date: string
@@ -824,6 +866,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      system_backups: {
+        Row: {
+          backup_data: Json
+          backup_type: string
+          created_at: string
+          created_by: string
+          id: string
+          restored_at: string | null
+          restored_by: string | null
+          status: string
+        }
+        Insert: {
+          backup_data: Json
+          backup_type?: string
+          created_at?: string
+          created_by: string
+          id?: string
+          restored_at?: string | null
+          restored_by?: string | null
+          status?: string
+        }
+        Update: {
+          backup_data?: Json
+          backup_type?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          restored_at?: string | null
+          restored_by?: string | null
+          status?: string
+        }
+        Relationships: []
       }
       system_settings: {
         Row: {

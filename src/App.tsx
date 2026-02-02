@@ -39,6 +39,7 @@ import NotFound from "./pages/NotFound";
 import Downloads from "./pages/Downloads";
 import ResearchDashboard from "./pages/ResearchDashboard";
 import ResearcherSettings from "./pages/ResearcherSettings";
+import ActivityLogs from "./pages/ActivityLogs";
 
 const queryClient = new QueryClient();
 
@@ -103,6 +104,9 @@ const App = () => (
                   <Route path="/follow-ups" element={<FollowUps />} />
                   <Route path="/admin/users" element={
                     <ProtectedRoute allowedRoles={['admin']}><UserManagement /></ProtectedRoute>
+                  } />
+                  <Route path="/admin/logs" element={
+                    <ProtectedRoute allowedRoles={['admin']}><ActivityLogs /></ProtectedRoute>
                   } />
                   <Route path="/settings" element={
                     <ProtectedRoute allowedRoles={['admin']}><Settings /></ProtectedRoute>

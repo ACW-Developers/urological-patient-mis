@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Palette, Building2, LayoutGrid, Volume2 } from 'lucide-react';
 import { ModuleVisibility } from '@/types/database';
 import { soundManager } from '@/lib/sounds';
+import BackupRestoreSection from '@/components/settings/BackupRestoreSection';
 
 const defaultModules: ModuleVisibility = {
   dashboard: true,
@@ -34,6 +35,7 @@ const defaultModules: ModuleVisibility = {
   reports: true,
   user_management: true,
   settings: true,
+  activity_logs: true,
 };
 
 // Only show toggles for core functional modules (not admin-only ones)
@@ -53,6 +55,7 @@ const moduleLabels: Partial<Record<keyof ModuleVisibility, string>> = {
   icu: 'ICU Management',
   follow_ups: 'Follow-ups',
   reports: 'Reports',
+  activity_logs: 'Activity Logs',
 };
 
 export default function Settings() {
@@ -245,6 +248,9 @@ export default function Settings() {
             </p>
           </CardContent>
         </Card>
+
+        {/* Backup & Restore Section */}
+        <BackupRestoreSection />
 
         <div className="flex justify-end">
           <Button

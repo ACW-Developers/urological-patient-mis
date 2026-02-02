@@ -5,12 +5,15 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { useState, useCallback } from 'react';
+import { useActivityLogger } from '@/hooks/useActivityLogger';
 
 function MainLayoutContent() {
   const { settings } = useSettings();
   const isMobile = useIsMobile();
   const { collapsed } = useSidebar();
-
+  
+  // Initialize activity logging for page views
+  useActivityLogger();
   return (
     <div className="min-h-screen bg-background flex w-full">
       <Sidebar />

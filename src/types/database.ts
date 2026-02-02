@@ -64,6 +64,32 @@ export interface ModuleVisibility {
   reports: boolean;
   user_management: boolean;
   settings: boolean;
+  activity_logs: boolean;
+}
+
+export interface ActivityLog {
+  id: string;
+  user_id: string;
+  action: string;
+  entity_type?: string;
+  entity_id?: string;
+  details?: Record<string, unknown>;
+  ip_address?: string;
+  user_agent?: string;
+  session_duration_seconds?: number;
+  page_path?: string;
+  created_at: string;
+}
+
+export interface SystemBackup {
+  id: string;
+  backup_type: string;
+  backup_data: Record<string, unknown>;
+  created_by: string;
+  created_at: string;
+  restored_at?: string;
+  restored_by?: string;
+  status: string;
 }
 
 export interface SystemSettings {
