@@ -14,6 +14,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import { format, subDays, parseISO } from 'date-fns';
 import { 
   Activity, 
@@ -31,7 +39,9 @@ import {
   Trash2,
   Plus,
   LogIn,
-  LogOut
+  LogOut,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import {
   LineChart,
@@ -67,6 +77,17 @@ interface ActivityLog {
   };
 }
 
+interface UserSummary {
+  user_id: string;
+  name: string;
+  email: string;
+  total_actions: number;
+  total_time_seconds: number;
+  last_active: string;
+  actions_by_type: Record<string, number>;
+  role?: string;
+}
+
 const actionIcons: Record<string, React.ReactNode> = {
   login: <LogIn className="w-4 h-4" />,
   logout: <LogOut className="w-4 h-4" />,
@@ -90,13 +111,43 @@ const actionColors: Record<string, string> = {
 };
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+const ITEMS_PER_PAGE = 20;
 
 export default function ActivityLogs() {
   const [searchTerm, setSearchTerm] = useState('');
   const [actionFilter, setActionFilter] = useState<string>('all');
+  const [userFilter, setUserFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState<string>('7');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const startDate = subDays(new Date(), parseInt(dateRange));
+
+  // Fetch all profiles for user filter dropdown
+  const { data: allProfiles = [] } = useQuery({
+    queryKey: ['all-profiles'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name, email')
+        .order('first_name');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Fetch user roles for display
+  const { data: userRoles = [] } = useQuery({
+    queryKey: ['user-roles-all'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('user_id, role');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const roleMap = new Map(userRoles.map(r => [r.user_id, r.role]));
 
   const { data: logs = [], isLoading } = useQuery({
     queryKey: ['activity-logs', dateRange],
@@ -106,7 +157,7 @@ export default function ActivityLogs() {
         .select('*')
         .gte('created_at', startDate.toISOString())
         .order('created_at', { ascending: false })
-        .limit(500);
+        .limit(1000);
 
       if (error) throw error;
 
@@ -139,15 +190,7 @@ export default function ActivityLogs() {
         .select('user_id, action, session_duration_seconds, created_at')
         .gte('created_at', startDate.toISOString());
 
-      const userStatsMap = new Map<string, {
-        user_id: string;
-        name: string;
-        email: string;
-        total_actions: number;
-        total_time_seconds: number;
-        last_active: string;
-        actions_by_type: Record<string, number>;
-      }>();
+      const userStatsMap = new Map<string, UserSummary>();
 
       profiles?.forEach(profile => {
         userStatsMap.set(profile.user_id, {
@@ -158,6 +201,7 @@ export default function ActivityLogs() {
           total_time_seconds: 0,
           last_active: '',
           actions_by_type: {},
+          role: roleMap.get(profile.user_id),
         });
       });
 
@@ -224,9 +268,23 @@ export default function ActivityLogs() {
       log.entity_type?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesAction = actionFilter === 'all' || log.action === actionFilter;
+    const matchesUser = userFilter === 'all' || log.user_id === userFilter;
 
-    return matchesSearch && matchesAction;
+    return matchesSearch && matchesAction && matchesUser;
   });
+
+  // Pagination
+  const totalPages = Math.ceil(filteredLogs.length / ITEMS_PER_PAGE);
+  const paginatedLogs = filteredLogs.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  // Reset page when filters change
+  const handleFilterChange = (setter: (value: string) => void, value: string) => {
+    setter(value);
+    setCurrentPage(1);
+  };
 
   const formatDuration = (seconds: number) => {
     if (seconds < 60) return `${seconds}s`;
@@ -240,7 +298,7 @@ export default function ActivityLogs() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-display font-bold text-foreground">Activity Logs</h1>
-        <p className="text-muted-foreground">Monitor user activity and system usage analytics</p>
+        <p className="text-muted-foreground">Monitor all user activity and system usage analytics</p>
       </div>
 
       {/* Stats Overview */}
@@ -393,20 +451,21 @@ export default function ActivityLogs() {
         </CardContent>
       </Card>
 
-      {/* User Activity Stats */}
+      {/* User Activity Summary */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <UserCheck className="h-5 w-5" />
             User Activity Summary
           </CardTitle>
-          <CardDescription>Activity breakdown per user</CardDescription>
+          <CardDescription>Aggregated activity per user</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>User</TableHead>
+                <TableHead>Role</TableHead>
                 <TableHead>Total Actions</TableHead>
                 <TableHead>Time Spent</TableHead>
                 <TableHead>Last Active</TableHead>
@@ -414,13 +473,18 @@ export default function ActivityLogs() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {userStats.slice(0, 10).map((stat) => (
+              {userStats.map((stat) => (
                 <TableRow key={stat.user_id}>
                   <TableCell>
                     <div>
                       <div className="font-medium">{stat.name}</div>
                       <div className="text-sm text-muted-foreground">{stat.email}</div>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="capitalize">
+                      {roleMap.get(stat.user_id) || 'Unknown'}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary">{stat.total_actions}</Badge>
@@ -448,27 +512,46 @@ export default function ActivityLogs() {
         </CardContent>
       </Card>
 
-      {/* Activity Logs Table */}
+      {/* Activity Logs Table with Pagination */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            Recent Activity
+            All Activity Logs
           </CardTitle>
-          <CardDescription>Detailed log of all user actions</CardDescription>
+          <CardDescription>
+            Showing {paginatedLogs.length} of {filteredLogs.length} logs
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4 mb-4">
-            <div className="relative flex-1">
+          <div className="flex flex-wrap gap-4 mb-4">
+            <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search by user, action, or entity..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="pl-10"
               />
             </div>
-            <Select value={actionFilter} onValueChange={setActionFilter}>
+            <Select value={userFilter} onValueChange={(v) => handleFilterChange(setUserFilter, v)}>
+              <SelectTrigger className="w-[200px]">
+                <Users className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Filter by user" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Users</SelectItem>
+                {allProfiles.map((profile) => (
+                  <SelectItem key={profile.user_id} value={profile.user_id}>
+                    {profile.first_name} {profile.last_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={actionFilter} onValueChange={(v) => handleFilterChange(setActionFilter, v)}>
               <SelectTrigger className="w-[180px]">
                 <Filter className="w-4 h-4 mr-2" />
                 <SelectValue placeholder="Filter by action" />
@@ -480,7 +563,7 @@ export default function ActivityLogs() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={dateRange} onValueChange={setDateRange}>
+            <Select value={dateRange} onValueChange={(v) => handleFilterChange(setDateRange, v)}>
               <SelectTrigger className="w-[180px]">
                 <Calendar className="w-4 h-4 mr-2" />
                 <SelectValue placeholder="Date range" />
@@ -497,56 +580,122 @@ export default function ActivityLogs() {
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">Loading activity logs...</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Timestamp</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Entity</TableHead>
-                  <TableHead>Page</TableHead>
-                  <TableHead>Duration</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredLogs.slice(0, 100).map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell className="text-sm">
-                      {format(parseISO(log.created_at), 'MMM d, yyyy h:mm:ss a')}
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">
-                          {log.user_profile?.first_name} {log.user_profile?.last_name}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {log.user_profile?.email}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className={`inline-flex items-center gap-2 px-2 py-1 rounded-full text-xs font-medium ${actionColors[log.action] || actionColors.default}`}>
-                        {actionIcons[log.action] || actionIcons.default}
-                        {log.action}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {log.entity_type && (
-                        <Badge variant="outline">{log.entity_type}</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {log.page_path || '-'}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {log.session_duration_seconds 
-                        ? formatDuration(log.session_duration_seconds) 
-                        : '-'}
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Timestamp</TableHead>
+                    <TableHead>User</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Action</TableHead>
+                    <TableHead>Entity</TableHead>
+                    <TableHead>Page</TableHead>
+                    <TableHead>Duration</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {paginatedLogs.map((log) => (
+                    <TableRow key={log.id}>
+                      <TableCell className="text-sm">
+                        {format(parseISO(log.created_at), 'MMM d, yyyy h:mm:ss a')}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">
+                            {log.user_profile?.first_name} {log.user_profile?.last_name}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {log.user_profile?.email}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="capitalize text-xs">
+                          {roleMap.get(log.user_id) || 'Unknown'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className={`inline-flex items-center gap-2 px-2 py-1 rounded-full text-xs font-medium ${actionColors[log.action] || actionColors.default}`}>
+                          {actionIcons[log.action] || actionIcons.default}
+                          {log.action}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {log.entity_type && (
+                          <Badge variant="outline">{log.entity_type}</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {log.page_path || '-'}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {log.session_duration_seconds 
+                          ? formatDuration(log.session_duration_seconds) 
+                          : '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Page {currentPage} of {totalPages}
+                  </p>
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          <ChevronLeft className="h-4 w-4 mr-1" />
+                          Previous
+                        </Button>
+                      </PaginationItem>
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum: number;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+                        return (
+                          <PaginationItem key={pageNum}>
+                            <PaginationLink
+                              onClick={() => setCurrentPage(pageNum)}
+                              isActive={currentPage === pageNum}
+                              className="cursor-pointer"
+                            >
+                              {pageNum}
+                            </PaginationLink>
+                          </PaginationItem>
+                        );
+                      })}
+                      <PaginationItem>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                          disabled={currentPage === totalPages}
+                        >
+                          Next
+                          <ChevronRight className="h-4 w-4 ml-1" />
+                        </Button>
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

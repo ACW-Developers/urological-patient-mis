@@ -29,7 +29,7 @@ interface DoctorSchedule {
   is_available: boolean;
 }
 
-// Component to generate appointment slots for the next 14 days
+// Component to generate appointment slots for the next 14 days based on doctor schedule
 function AppointmentSlotOptions({ 
   doctorId, 
   doctorSchedules 
@@ -42,7 +42,7 @@ function AppointmentSlotOptions({
   useEffect(() => {
     const fetchAppointments = async () => {
       const today = new Date();
-      const endDate = addDays(today, 7);
+      const endDate = addDays(today, 14);
       
       const { data, error } = await supabase
         .from('appointments')
@@ -71,24 +71,22 @@ function AppointmentSlotOptions({
   const now = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Generate slots for the next 7 days
-  for (let d = 0; d <= 7; d++) {
+  // Generate slots for the next 14 days
+  for (let d = 0; d <= 14; d++) {
     const date = addDays(today, d);
     const dayOfWeek = getDay(date);
     const dateKey = format(date, 'yyyy-MM-dd');
     
-    // Find doctor's schedule for this day, or use default hours (9 AM - 5 PM)
+    // Find doctor's schedule for this specific day - MUST have is_available = true
     const schedule = doctorSchedules?.find(
-      s => s.doctor_id === doctorId && s.day_of_week === dayOfWeek && s.is_available
+      s => s.doctor_id === doctorId && s.day_of_week === dayOfWeek && s.is_available === true
     );
 
-    // Use schedule hours if available, otherwise default to 9 AM - 5 PM (skip Sunday = 0)
-    const startHour = schedule ? parseInt(schedule.start_time.split(':')[0]) : 9;
-    const endHour = schedule ? parseInt(schedule.end_time.split(':')[0]) : 17;
+    // If doctor has no schedule or is unavailable on this day, skip entirely
+    if (!schedule) continue;
     
-    // Skip if no schedule and it's a Sunday
-    if (!schedule && dayOfWeek === 0) continue;
-    
+    const startHour = parseInt(schedule.start_time.split(':')[0]);
+    const endHour = parseInt(schedule.end_time.split(':')[0]);
     const bookedTimes = existingAppointments[dateKey] || [];
 
     for (let h = startHour; h < endHour; h++) {
@@ -115,7 +113,7 @@ function AppointmentSlotOptions({
   if (slots.length === 0) {
     return (
       <SelectItem value="no-slots" disabled className="text-sm text-muted-foreground">
-        No available slots in the next 7 days
+        No available slots - Doctor may not have set their schedule
       </SelectItem>
     );
   }
@@ -185,26 +183,27 @@ export default function Appointments() {
     },
   });
 
-  // Fetch doctors with their schedules
+  // Fetch doctors with their schedules - use profiles and check roles separately
   const { data: doctors } = useQuery({
     queryKey: ['doctors-list'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First get all profiles
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('*');
+      if (profileError) throw profileError;
+
+      // Then get doctor role user IDs
+      const { data: doctorRoles, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id')
         .eq('role', 'doctor');
-      if (error) throw error;
+      if (rolesError) throw rolesError;
 
-      const doctorIds = data.map(d => d.user_id);
-      if (doctorIds.length === 0) return [];
-
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('user_id', doctorIds);
-      if (profileError) throw profileError;
-
-      return profiles as Profile[];
+      const doctorIds = new Set(doctorRoles?.map(d => d.user_id) || []);
+      
+      // Filter profiles to only doctors
+      return (profiles || []).filter(p => doctorIds.has(p.user_id)) as Profile[];
     },
   });
 
@@ -240,22 +239,35 @@ export default function Appointments() {
 
   // Calculate available time slots based on doctor's schedule
   const availableTimeSlots = useMemo(() => {
-    if (!formData.doctorId || !doctorSchedules) return [];
+    if (!formData.doctorId) return [];
 
     const dayOfWeek = getDay(formData.appointmentDate);
-    const doctorSchedule = doctorSchedules.find(
-      s => s.doctor_id === formData.doctorId && s.day_of_week === dayOfWeek
+    
+    // Find doctor's schedule for this specific day
+    const doctorSchedule = doctorSchedules?.find(
+      s => s.doctor_id === formData.doctorId && s.day_of_week === dayOfWeek && s.is_available
     );
 
+    // If doctor has no schedule set or is not available on this day, return empty
     if (!doctorSchedule) return [];
 
     const slots: string[] = [];
     const startHour = parseInt(doctorSchedule.start_time.split(':')[0]);
     const endHour = parseInt(doctorSchedule.end_time.split(':')[0]);
+    const today = new Date();
+    const isToday = format(formData.appointmentDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
 
     for (let h = startHour; h < endHour; h++) {
       for (let m = 0; m < 60; m += 30) {
         const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+        
+        // Skip past times if booking for today
+        if (isToday) {
+          const slotTime = new Date(formData.appointmentDate);
+          slotTime.setHours(h, m);
+          if (slotTime <= today) continue;
+        }
+        
         if (!existingAppointments?.includes(time)) {
           slots.push(time);
         }
