@@ -185,6 +185,26 @@
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
 
+  .badge-scheduled {
+    @apply bg-info/15 text-info border border-info/30;
+  }
+
+  .badge-confirmed {
+    @apply bg-primary/15 text-primary border border-primary/30;
+  }
+
+  .badge-completed {
+    @apply bg-success/15 text-success border border-success/30;
+  }
+
+  .badge-cancelled {
+    @apply bg-destructive/15 text-destructive border border-destructive/30;
+  }
+
+  .badge-no-show {
+    @apply bg-warning/15 text-warning border border-warning/30;
+  }
+
   .form-section {
     @apply glass-card rounded-xl p-6 space-y-4;
   }
