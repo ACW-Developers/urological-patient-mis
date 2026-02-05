@@ -342,7 +342,12 @@ export default function VitalsPage() {
                   ) : (
                     vitals?.map((vital) => (
                       <TableRow key={vital.id}>
-                        <TableCell>{format(new Date(vital.recorded_at), 'PPp')}</TableCell>
+                        <TableCell>
+                          <div>{format(new Date(vital.recorded_at), 'MMM d, yyyy')}</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            Collected at {format(new Date(vital.recorded_at), 'h:mm a')}
+                          </div>
+                        </TableCell>
                         <TableCell className="font-medium">
                           {vital.systolic_bp}/{vital.diastolic_bp}
                         </TableCell>

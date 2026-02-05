@@ -368,8 +368,11 @@ export default function ICU() {
                           </div>
                         </TableCell>
                         <TableCell className="font-medium">
-                          {admission.patient?.first_name} {admission.patient?.last_name}
+                          <div>{admission.patient?.first_name} {admission.patient?.last_name}</div>
                           <div className="text-xs text-muted-foreground">{admission.patient?.patient_number}</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            Admitted {format(new Date(admission.admitted_at), 'h:mm a')}
+                          </div>
                         </TableCell>
                         <TableCell className="max-w-xs truncate">{admission.admission_reason}</TableCell>
                         <TableCell>

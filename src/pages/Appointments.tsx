@@ -673,6 +673,9 @@ export default function Appointments() {
                         <div>
                           <p className="font-medium text-sm">{apt.patient?.first_name} {apt.patient?.last_name}</p>
                           <p className="text-xs text-muted-foreground">{apt.patient?.patient_number}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            Booked {format(new Date(apt.created_at), 'MMM d, h:mm a')}
+                          </p>
                         </div>
                       </TableCell>
                       <TableCell className="hidden sm:table-cell text-sm py-2">

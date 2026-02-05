@@ -220,8 +220,11 @@ export default function DoctorPatients() {
                             <div className="text-sm text-muted-foreground">
                               {patient.patient_number}
                             </div>
-                            <div className="text-xs text-muted-foreground">
-                              {patient.blood_type && `Blood: ${patient.blood_type}`}
+                            <div className="text-[10px] text-muted-foreground">
+                              {patient.blood_type && `Blood: ${patient.blood_type} • `}
+                              {patient.latest_vitals && (
+                                <>Vitals: {format(new Date(patient.latest_vitals.recorded_at), 'MMM d, h:mm a')}</>
+                              )}
                             </div>
                           </div>
                         </TableCell>

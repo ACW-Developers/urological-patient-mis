@@ -203,7 +203,10 @@ export default function Patients() {
                     <TableRow key={patient.id} className="hover:bg-muted/50">
                       <TableCell className="font-mono text-sm">{patient.patient_number}</TableCell>
                       <TableCell className="font-medium">
-                        {patient.first_name} {patient.last_name}
+                        <div>{patient.first_name} {patient.last_name}</div>
+                        <div className="text-[10px] text-muted-foreground font-normal">
+                          Registered {format(new Date(patient.created_at), 'MMM d, yyyy')}
+                        </div>
                       </TableCell>
                       <TableCell>
                         {age} yrs / {patient.gender}
@@ -289,6 +292,9 @@ export default function Patients() {
                 <div>
                   <p className="text-sm text-muted-foreground">Patient Number</p>
                   <p className="font-mono font-medium">{selectedPatient.patient_number}</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Registered {format(new Date(selectedPatient.created_at), 'MMM d, yyyy \'at\' h:mm a')}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Status</p>

@@ -419,8 +419,11 @@ export default function PreOperative() {
                     {pendingSurgeries?.map((surgery) => (
                       <TableRow key={surgery.id}>
                         <TableCell className="font-medium">
-                          {surgery.patient?.first_name} {surgery.patient?.last_name}
+                          <div>{surgery.patient?.first_name} {surgery.patient?.last_name}</div>
                           <div className="text-xs text-muted-foreground">{surgery.patient?.patient_number}</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            Created {format(new Date(surgery.created_at), 'MMM d, h:mm a')}
+                          </div>
                         </TableCell>
                         <TableCell>
                           {surgery.surgery_name}

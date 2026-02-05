@@ -352,6 +352,9 @@ export default function DoctorConsultationPage() {
                             {patient.first_name} {patient.last_name}
                           </p>
                           <p className="text-xs text-muted-foreground">{patient.patient_number}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            Registered {format(new Date(patient.created_at), 'MMM d, yyyy')}
+                          </p>
                         </div>
                         <div className="text-right text-xs text-muted-foreground">
                           <p>{getPatientAge(patient.date_of_birth)} yrs</p>

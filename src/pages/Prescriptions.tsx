@@ -453,8 +453,11 @@ export default function Prescriptions() {
                       {filteredPrescriptions?.map((prescription) => (
                         <TableRow key={prescription.id}>
                           <TableCell className="font-medium">
-                            {prescription.patient?.first_name} {prescription.patient?.last_name}
+                            <div>{prescription.patient?.first_name} {prescription.patient?.last_name}</div>
                             <div className="text-xs text-muted-foreground">{prescription.patient?.patient_number}</div>
+                            <div className="text-[10px] text-muted-foreground">
+                              Prescribed {format(new Date(prescription.prescribed_at), 'h:mm a')}
+                            </div>
                           </TableCell>
                           <TableCell>{getStatusBadge(prescription.status)}</TableCell>
                           <TableCell>{format(new Date(prescription.prescribed_at), 'MMM d, yyyy')}</TableCell>

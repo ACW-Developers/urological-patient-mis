@@ -335,8 +335,11 @@ export default function LabOrders() {
                   {filteredTests?.map((test) => (
                     <TableRow key={test.id}>
                       <TableCell className="font-medium">
-                        {test.patient?.first_name} {test.patient?.last_name}
+                        <div>{test.patient?.first_name} {test.patient?.last_name}</div>
                         <div className="text-xs text-muted-foreground">{test.patient?.patient_number}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          Ordered {format(new Date(test.ordered_at), 'h:mm a')}
+                        </div>
                       </TableCell>
                       <TableCell>
                         {test.test_name}

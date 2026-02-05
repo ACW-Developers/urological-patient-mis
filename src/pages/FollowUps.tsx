@@ -295,8 +295,11 @@ export default function FollowUps() {
                   {filteredFollowUps?.map((followUp) => (
                     <TableRow key={followUp.id}>
                       <TableCell className="font-medium">
-                        {followUp.patient?.first_name} {followUp.patient?.last_name}
+                        <div>{followUp.patient?.first_name} {followUp.patient?.last_name}</div>
                         <div className="text-xs text-muted-foreground">{followUp.patient?.patient_number}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          Created {format(new Date(followUp.created_at), 'MMM d, h:mm a')}
+                        </div>
                       </TableCell>
                       <TableCell>{followUp.reason}</TableCell>
                       <TableCell>{format(new Date(followUp.scheduled_date), 'MMM d, yyyy')}</TableCell>
