@@ -167,11 +167,45 @@ export default function Teleconferencing() {
     if (!user) return;
     setLoading(true);
     try {
-      const { data: meetingsData } = await supabase
-        .from('meetings')
-        .select('*')
-        .order('scheduled_date', { ascending: false });
-      setMeetings((meetingsData as Meeting[]) || []);
+      // Admins see all meetings; doctors only see meetings they created or were invited to
+      if (isAdmin) {
+        const { data: meetingsData } = await supabase
+          .from('meetings')
+          .select('*')
+          .order('scheduled_date', { ascending: false });
+        setMeetings((meetingsData as Meeting[]) || []);
+      } else if (role === 'doctor') {
+        // Get meetings user created
+        const { data: createdMeetings } = await supabase
+          .from('meetings')
+          .select('*')
+          .eq('created_by', user.id)
+          .order('scheduled_date', { ascending: false });
+
+        // Get meetings user was invited to
+        const { data: invitedParticipants } = await supabase
+          .from('meeting_participants')
+          .select('meeting_id')
+          .eq('user_id', user.id);
+
+        const invitedMeetingIds = (invitedParticipants || []).map(p => p.meeting_id);
+        let invitedMeetings: Meeting[] = [];
+        if (invitedMeetingIds.length > 0) {
+          const { data } = await supabase
+            .from('meetings')
+            .select('*')
+            .in('id', invitedMeetingIds)
+            .order('scheduled_date', { ascending: false });
+          invitedMeetings = (data as Meeting[]) || [];
+        }
+
+        // Merge and deduplicate
+        const allMeetings = [...(createdMeetings as Meeting[] || []), ...invitedMeetings];
+        const uniqueMeetings = allMeetings.filter((m, i, arr) => arr.findIndex(x => x.id === m.id) === i);
+        setMeetings(uniqueMeetings);
+      } else {
+        setMeetings([]);
+      }
 
       const { data: invitations } = await supabase
         .from('meeting_participants')

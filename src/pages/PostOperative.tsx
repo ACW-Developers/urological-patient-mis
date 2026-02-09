@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,14 +12,14 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Search, FileEdit, CheckCircle, BedDouble, ArrowRight, Trash2, Home } from 'lucide-react';
+import { Search, FileEdit, CheckCircle, BedDouble, ArrowRight, Trash2, Home, Mic, MicOff, Loader2, Sparkles, FileText } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import type { Surgery, Patient } from '@/types/database';
 import { soundManager } from '@/lib/sounds';
 
-// Available ICU/CCU beds
 const icuBeds = ['ICU-1', 'ICU-2', 'ICU-3', 'ICU-4', 'ICU-5', 'ICU-6', 'CCU-1', 'CCU-2', 'CCU-3', 'CCU-4'];
 const wardBeds = ['W-101', 'W-102', 'W-103', 'W-104', 'W-105', 'W-106', 'W-107', 'W-108', 'W-109', 'W-110', 'W-201', 'W-202', 'W-203', 'W-204', 'W-205'];
 
@@ -34,6 +34,18 @@ export default function PostOperative() {
   const [selectedSurgery, setSelectedSurgery] = useState<(Surgery & { patient: Patient }) | null>(null);
   const [postOpNotes, setPostOpNotes] = useState('');
   const [selectedBed, setSelectedBed] = useState('');
+
+  // Voice transcription state
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [rawTranscription, setRawTranscription] = useState('');
+  const [notesTab, setNotesTab] = useState<'voice' | 'manual'>('voice');
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  const isAdmin = role === 'admin';
+  const isDoctor = role === 'doctor';
 
   const { data: surgeries, isLoading } = useQuery({
     queryKey: ['postop-surgeries'],
@@ -147,6 +159,8 @@ export default function PostOperative() {
   const openNotesDialog = (surgery: Surgery & { patient: Patient }) => {
     setSelectedSurgery(surgery);
     setPostOpNotes(surgery.post_op_notes || '');
+    setRawTranscription('');
+    setNotesTab(isDoctor ? 'voice' : 'manual');
     setNotesDialogOpen(true);
   };
 
@@ -155,13 +169,167 @@ export default function PostOperative() {
     updateSurgeryMutation.mutate({ id: selectedSurgery.id, updates: { post_op_notes: postOpNotes } });
   };
 
+  // Voice recording handlers
+  const startRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        await transcribeAudio(audioBlob);
+      };
+
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start(1000);
+      setIsRecording(true);
+      toast.info('Recording started — speak your surgical notes');
+    } catch (err) {
+      toast.error('Microphone access denied. Please allow microphone access.');
+    }
+  }, []);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  }, [isRecording]);
+
+  const transcribeAudio = async (audioBlob: Blob) => {
+    setIsTranscribing(true);
+    try {
+      // Use browser's SpeechRecognition API via a simulated approach
+      // Since we need server-side transcription, we'll send audio to our edge function
+      // First, convert blob to base64
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onloadend = () => {
+          const base64 = (reader.result as string).split(',')[1];
+          resolve(base64);
+        };
+        reader.readAsDataURL(audioBlob);
+      });
+      const base64Audio = await base64Promise;
+
+      // Use the Web Speech API for transcription (client-side, no extra API key needed)
+      const text = await useWebSpeechTranscription(audioBlob);
+      setRawTranscription(text);
+      toast.success('Audio transcribed successfully');
+    } catch (err) {
+      toast.error('Transcription failed. Please try again or type manually.');
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
+  const useWebSpeechTranscription = (audioBlob: Blob): Promise<string> => {
+    // Fallback: use a manual recording with live transcription
+    // This is a placeholder — we'll use live recognition instead
+    return Promise.resolve(rawTranscription);
+  };
+
+  // Use live speech recognition for real-time transcription
+  const startLiveRecording = useCallback(async () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error('Speech recognition is not supported in this browser. Please use Chrome.');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    let finalTranscript = rawTranscription;
+
+    recognition.onresult = (event: any) => {
+      let interimTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript + ' ';
+          setRawTranscription(finalTranscript);
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      if (event.error !== 'no-speech') {
+        toast.error(`Recognition error: ${event.error}`);
+      }
+      setIsRecording(false);
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+    };
+
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      recognition.start();
+      setIsRecording(true);
+      mediaRecorderRef.current = { stop: () => recognition.stop() } as any;
+      toast.info('Listening — speak your surgical notes clearly');
+    } catch (err) {
+      toast.error('Microphone access denied');
+    }
+  }, [rawTranscription]);
+
+  const generateAIReport = useCallback(async () => {
+    if (!rawTranscription.trim()) {
+      toast.error('No transcribed text to generate report from');
+      return;
+    }
+    if (!selectedSurgery) return;
+
+    setIsGeneratingReport(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('transcribe-surgical-notes', {
+        body: {
+          transcription: rawTranscription,
+          patientInfo: {
+            name: `${selectedSurgery.patient?.first_name} ${selectedSurgery.patient?.last_name}`,
+            patientNumber: selectedSurgery.patient?.patient_number,
+            bloodType: selectedSurgery.patient?.blood_type,
+          },
+          surgeryInfo: {
+            name: selectedSurgery.surgery_name,
+            type: selectedSurgery.surgery_type,
+            intraOpNotes: selectedSurgery.intra_op_notes,
+            complications: selectedSurgery.complications,
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      setPostOpNotes(data.report);
+      toast.success('AI report generated successfully');
+      soundManager.playSuccess();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to generate report');
+      soundManager.playError();
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  }, [rawTranscription, selectedSurgery]);
+
   const filteredSurgeries = surgeries?.filter((s) =>
     s.patient?.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.patient?.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.surgery_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  const isAdmin = role === 'admin';
 
   return (
     <div className="space-y-6">
@@ -172,7 +340,6 @@ export default function PostOperative() {
         </div>
       </div>
 
-      {/* Summary Card */}
       <div className="grid gap-4 md:grid-cols-1">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -186,7 +353,6 @@ export default function PostOperative() {
         </Card>
       </div>
 
-      {/* Post-Op Care Section */}
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row gap-4">
@@ -246,7 +412,7 @@ export default function PostOperative() {
                     <TableCell>
                       <div className="flex gap-2 flex-wrap">
                         <Button size="sm" variant="outline" onClick={() => openNotesDialog(surgery)}>
-                          <FileEdit className="h-4 w-4 mr-1" /> Notes
+                          {(isDoctor || isAdmin) ? <><Mic className="h-4 w-4 mr-1" /> Dictate</> : <><FileEdit className="h-4 w-4 mr-1" /> Notes</>}
                         </Button>
                         <Button size="sm" onClick={() => { setSelectedSurgery(surgery); setSelectedBed(''); setIcuTransferDialogOpen(true); }} className="gap-1">
                           <BedDouble className="h-4 w-4" /> ICU
@@ -281,32 +447,99 @@ export default function PostOperative() {
         </CardContent>
       </Card>
 
-      {/* Post-Op Notes Dialog */}
+      {/* Post-Op Notes Dialog — Role-based: doctors get voice, admin gets both */}
       <Dialog open={notesDialogOpen} onOpenChange={setNotesDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Post-Operative Notes</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Post-Operative Surgical Notes</DialogTitle></DialogHeader>
           <div className="space-y-4">
+            {/* Patient & Surgery Info */}
             <div className="p-3 bg-muted rounded-lg">
-              <p className="font-medium">{selectedSurgery?.patient?.first_name} {selectedSurgery?.patient?.last_name}</p>
-              <p className="text-sm text-muted-foreground">{selectedSurgery?.surgery_name}</p>
+              <p className="font-medium">{selectedSurgery?.patient?.first_name} {selectedSurgery?.patient?.last_name}
+                <span className="text-sm text-muted-foreground ml-2">{selectedSurgery?.patient?.patient_number}</span>
+              </p>
+              <p className="text-sm text-muted-foreground">{selectedSurgery?.surgery_name} • <span className="capitalize">{selectedSurgery?.surgery_type}</span></p>
+              {selectedSurgery?.patient?.blood_type && (
+                <Badge variant="outline" className="mt-1 text-xs">{selectedSurgery.patient.blood_type}</Badge>
+              )}
             </div>
+
+            {/* Intra-op notes from OR */}
             <div>
-              <Label>Surgical Notes (from OR)</Label>
+              <Label className="text-xs text-muted-foreground">Surgical Notes (from OR)</Label>
               <div className="p-3 bg-muted/50 rounded-lg text-sm mt-1">{selectedSurgery?.intra_op_notes || 'No intra-operative notes recorded'}</div>
             </div>
+
             {selectedSurgery?.complications && (
               <div>
-                <Label className="text-destructive">Complications Noted</Label>
+                <Label className="text-destructive text-xs">Complications Noted</Label>
                 <div className="p-3 bg-destructive/10 rounded-lg text-sm mt-1 text-destructive">{selectedSurgery.complications}</div>
               </div>
             )}
-            <div>
-              <Label>Post-Operative Notes</Label>
-              <Textarea value={postOpNotes} onChange={(e) => setPostOpNotes(e.target.value)} placeholder="Document post-operative observations, recovery plan, special instructions..." rows={4} />
-            </div>
+
+            {/* Tabbed interface for admin, voice-only for doctors */}
+            {isAdmin ? (
+              <Tabs value={notesTab} onValueChange={(v) => setNotesTab(v as 'voice' | 'manual')}>
+                <TabsList className="w-full">
+                  <TabsTrigger value="voice" className="flex-1 gap-1"><Mic className="h-3 w-3" /> Voice Dictation</TabsTrigger>
+                  <TabsTrigger value="manual" className="flex-1 gap-1"><FileText className="h-3 w-3" /> Manual Entry</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="voice">
+                  <VoiceDictationPanel
+                    isRecording={isRecording}
+                    isTranscribing={isTranscribing}
+                    isGeneratingReport={isGeneratingReport}
+                    rawTranscription={rawTranscription}
+                    setRawTranscription={setRawTranscription}
+                    startLiveRecording={startLiveRecording}
+                    stopRecording={stopRecording}
+                    generateAIReport={generateAIReport}
+                  />
+                </TabsContent>
+
+                <TabsContent value="manual">
+                  <div>
+                    <Label>Post-Operative Notes</Label>
+                    <Textarea value={postOpNotes} onChange={(e) => setPostOpNotes(e.target.value)} placeholder="Document post-operative observations, recovery plan, special instructions..." rows={6} />
+                  </div>
+                </TabsContent>
+              </Tabs>
+            ) : isDoctor ? (
+              <VoiceDictationPanel
+                isRecording={isRecording}
+                isTranscribing={isTranscribing}
+                isGeneratingReport={isGeneratingReport}
+                rawTranscription={rawTranscription}
+                setRawTranscription={setRawTranscription}
+                startLiveRecording={startLiveRecording}
+                stopRecording={stopRecording}
+                generateAIReport={generateAIReport}
+              />
+            ) : (
+              <div>
+                <Label>Post-Operative Notes</Label>
+                <Textarea value={postOpNotes} onChange={(e) => setPostOpNotes(e.target.value)} placeholder="Document post-operative observations, recovery plan, special instructions..." rows={6} />
+              </div>
+            )}
+
+            {/* Generated report preview */}
+            {postOpNotes && (
+              <div>
+                <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" /> Generated Report
+                </Label>
+                <div className="p-4 border rounded-lg bg-card mt-1 text-sm whitespace-pre-wrap max-h-60 overflow-y-auto">
+                  {postOpNotes}
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setNotesDialogOpen(false)}>Cancel</Button>
-              <Button onClick={savePostOpNotes} disabled={updateSurgeryMutation.isPending}>Save Notes</Button>
+              <Button onClick={savePostOpNotes} disabled={updateSurgeryMutation.isPending || !postOpNotes.trim()}>
+                {updateSurgeryMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                Save Notes
+              </Button>
             </div>
           </div>
         </DialogContent>
@@ -373,6 +606,85 @@ export default function PostOperative() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// Voice Dictation Panel Component
+function VoiceDictationPanel({
+  isRecording,
+  isTranscribing,
+  isGeneratingReport,
+  rawTranscription,
+  setRawTranscription,
+  startLiveRecording,
+  stopRecording,
+  generateAIReport,
+}: {
+  isRecording: boolean;
+  isTranscribing: boolean;
+  isGeneratingReport: boolean;
+  rawTranscription: string;
+  setRawTranscription: (v: string) => void;
+  startLiveRecording: () => void;
+  stopRecording: () => void;
+  generateAIReport: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      {/* Recording controls */}
+      <div className="flex items-center gap-3">
+        {!isRecording ? (
+          <Button onClick={startLiveRecording} disabled={isTranscribing} className="gap-2" variant="outline" size="lg">
+            <Mic className="h-5 w-5" />
+            Start Dictation
+          </Button>
+        ) : (
+          <Button onClick={stopRecording} variant="destructive" size="lg" className="gap-2 animate-pulse">
+            <MicOff className="h-5 w-5" />
+            Stop Recording
+          </Button>
+        )}
+        {isRecording && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive"></span>
+            </span>
+            Recording...
+          </div>
+        )}
+        {isTranscribing && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Transcribing...
+          </div>
+        )}
+      </div>
+
+      {/* Raw transcription */}
+      <div>
+        <Label className="text-xs text-muted-foreground">Transcribed Text (editable)</Label>
+        <Textarea
+          value={rawTranscription}
+          onChange={(e) => setRawTranscription(e.target.value)}
+          placeholder="Your spoken words will appear here in real-time..."
+          rows={4}
+          className="mt-1"
+        />
+      </div>
+
+      {/* Generate AI Report button */}
+      <Button
+        onClick={generateAIReport}
+        disabled={!rawTranscription.trim() || isGeneratingReport}
+        className="w-full gap-2"
+      >
+        {isGeneratingReport ? (
+          <><Loader2 className="h-4 w-4 animate-spin" /> Generating Report...</>
+        ) : (
+          <><Sparkles className="h-4 w-4" /> Generate Structured Report with AI</>
+        )}
+      </Button>
     </div>
   );
 }
