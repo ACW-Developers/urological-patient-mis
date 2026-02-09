@@ -1123,6 +1123,79 @@ export type Database = {
           },
         ]
       }
+      ward_admissions: {
+        Row: {
+          admission_reason: string
+          admitted_at: string
+          admitted_by: string
+          bed_number: string | null
+          created_at: string
+          discharge_notes: string | null
+          discharged_at: string | null
+          icu_admission_id: string | null
+          id: string
+          patient_id: string
+          source: string
+          status: string
+          surgery_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          admission_reason: string
+          admitted_at?: string
+          admitted_by: string
+          bed_number?: string | null
+          created_at?: string
+          discharge_notes?: string | null
+          discharged_at?: string | null
+          icu_admission_id?: string | null
+          id?: string
+          patient_id: string
+          source?: string
+          status?: string
+          surgery_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          admission_reason?: string
+          admitted_at?: string
+          admitted_by?: string
+          bed_number?: string | null
+          created_at?: string
+          discharge_notes?: string | null
+          discharged_at?: string | null
+          icu_admission_id?: string | null
+          id?: string
+          patient_id?: string
+          source?: string
+          status?: string
+          surgery_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ward_admissions_icu_admission_id_fkey"
+            columns: ["icu_admission_id"]
+            isOneToOne: false
+            referencedRelation: "icu_admissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ward_admissions_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ward_admissions_surgery_id_fkey"
+            columns: ["surgery_id"]
+            isOneToOne: false
+            referencedRelation: "surgeries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

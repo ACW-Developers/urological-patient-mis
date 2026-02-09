@@ -42,6 +42,7 @@ import ResearchDashboard from "./pages/ResearchDashboard";
 import ResearcherSettings from "./pages/ResearcherSettings";
 import ActivityLogs from "./pages/ActivityLogs";
 import Teleconferencing from "./pages/Teleconferencing";
+import Ward from "./pages/Ward";
 
 const queryClient = new QueryClient();
 
@@ -109,6 +110,9 @@ const App = () => (
                   <Route path="/follow-ups" element={<FollowUps />} />
                   <Route path="/teleconferencing" element={
                     <ProtectedRoute allowedRoles={['admin', 'doctor']}><Teleconferencing /></ProtectedRoute>
+                  } />
+                  <Route path="/ward" element={
+                    <ProtectedRoute allowedRoles={['admin', 'doctor', 'nurse']}><Ward /></ProtectedRoute>
                   } />
                   <Route path="/admin/users" element={
                     <ProtectedRoute allowedRoles={['admin']}><UserManagement /></ProtectedRoute>

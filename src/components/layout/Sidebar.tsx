@@ -64,6 +64,7 @@ const navItems: NavItem[] = [
   { label: 'Intra-Operative', icon: Syringe, path: '/intra-operative', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'intra_operative' },
   { label: 'Post-Operative', icon: BedDouble, path: '/post-operative', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'post_operative' },
   { label: 'ICU', icon: BedDouble, path: '/icu', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'icu' },
+  { label: 'Ward', icon: BedDouble, path: '/ward', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'ward' },
   { label: 'Follow-ups', icon: Heart, path: '/follow-ups', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'follow_ups' },
   { label: 'Teleconferencing', icon: Video, path: '/teleconferencing', roles: ['admin', 'doctor'], moduleKey: 'teleconferencing' },
   { label: 'Reports', icon: BarChart3, path: '/reports', roles: ['admin', 'doctor', 'nurse', 'researcher', 'lab_technician', 'pharmacist'], moduleKey: 'reports' },

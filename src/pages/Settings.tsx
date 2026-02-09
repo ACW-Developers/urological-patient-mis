@@ -37,6 +37,7 @@ const defaultModules: ModuleVisibility = {
   settings: true,
   activity_logs: true,
   teleconferencing: true,
+  ward: true,
 };
 
 // Only show toggles for core functional modules (not admin-only ones)
@@ -58,6 +59,7 @@ const moduleLabels: Partial<Record<keyof ModuleVisibility, string>> = {
   reports: 'Reports',
   activity_logs: 'Activity Logs',
   teleconferencing: 'Teleconferencing',
+  ward: 'Ward Management',
 };
 
 export default function Settings() {

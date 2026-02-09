@@ -66,6 +66,7 @@ export interface ModuleVisibility {
   settings: boolean;
   activity_logs: boolean;
   teleconferencing: boolean;
+  ward: boolean;
 }
 
 export interface ActivityLog {

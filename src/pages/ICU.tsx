@@ -130,6 +130,9 @@ export default function ICU() {
 
   const dischargeMutation = useMutation({
     mutationFn: async (id: string) => {
+      // Find the admission to get patient info
+      const admission = admissions?.find(a => a.id === id);
+      
       const { error } = await supabase
         .from('icu_admissions')
         .update({
@@ -138,10 +141,24 @@ export default function ICU() {
         })
         .eq('id', id);
       if (error) throw error;
+
+      // Auto-transfer to Ward for final recovery
+      if (admission) {
+        await supabase.from('ward_admissions').insert({
+          patient_id: admission.patient_id,
+          surgery_id: admission.surgery_id || null,
+          icu_admission_id: admission.id,
+          admitted_by: user?.id,
+          admission_reason: `ICU step-down: ${admission.admission_reason}`,
+          source: 'icu_discharge',
+          status: 'admitted',
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['icu-admissions'] });
-      toast.success('Patient discharged from ICU');
+      queryClient.invalidateQueries({ queryKey: ['ward-admissions'] });
+      toast.success('Patient discharged from ICU and transferred to Ward');
     },
     onError: (error: Error) => {
       toast.error(error.message);
