@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSettings } from '@/contexts/SettingsContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Heart, Loader2, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { Heart, Loader2, Mail, Lock, User, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 import authLoginImg from '@/assets/auth-login.jpg';
@@ -36,6 +37,9 @@ export default function Auth() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('login');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSent, setResetSent] = useState(false);
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -105,6 +109,25 @@ export default function Auth() {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail.trim()) {
+      toast({ title: 'Error', description: 'Please enter your email address.', variant: 'destructive' });
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: `${window.location.origin}/auth`,
+    });
+    setLoading(false);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      setResetSent(true);
+      toast({ title: 'Email Sent', description: 'Check your inbox for a password reset link.' });
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -117,11 +140,31 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen flex bg-background">
-      {/* Left — Form */}
+      {/* Left — Hero Image */}
+      <div className="hidden lg:block lg:w-1/2 relative overflow-hidden">
+        <img
+          src={heroImage}
+          alt="Medical facility"
+          className="absolute inset-0 w-full h-full object-cover transition-all duration-700"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-background/60 via-transparent to-background/30" />
+        <div className="absolute bottom-10 left-10 right-10">
+          <p className="text-primary-foreground font-display text-xl font-semibold drop-shadow-lg">
+            {activeTab === 'login' ? 'Advanced Clinical Decision Support' : 'World-Class Cardiovascular Care'}
+          </p>
+          <p className="text-primary-foreground/80 text-sm mt-2 drop-shadow">
+            {activeTab === 'login'
+              ? 'Empowering medical teams with real-time data and intelligent insights.'
+              : 'Comprehensive patient registry powering better surgical outcomes.'}
+          </p>
+        </div>
+      </div>
+
+      {/* Right — Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-10">
         <div className="w-full max-w-md animate-fade-in">
           {/* Logo */}
-          <div className="mb-8">
+          <div className="mb-8 text-center">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl gradient-primary glow-primary mb-4">
               <Heart className="w-6 h-6 text-primary-foreground" />
             </div>
@@ -133,122 +176,155 @@ export default function Auth() {
             </p>
           </div>
 
-          <Card className="border-border/50 shadow-sm">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <CardHeader className="pb-4">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="login">Sign In</TabsTrigger>
-                  <TabsTrigger value="signup">Sign Up</TabsTrigger>
-                </TabsList>
+          {/* Forgot Password View */}
+          {showForgotPassword ? (
+            <Card className="border-border/50 shadow-sm">
+              <CardHeader className="text-center">
+                <h2 className="font-display text-lg font-semibold text-foreground">Reset Password</h2>
+                <p className="text-sm text-muted-foreground">Enter your email to receive a reset link</p>
               </CardHeader>
-
-              <TabsContent value="login">
-                <form onSubmit={handleLogin}>
+              {resetSent ? (
+                <CardContent className="text-center space-y-4">
+                  <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+                    <Mail className="w-8 h-8 text-primary" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    We've sent a password reset link to <span className="font-medium text-foreground">{resetEmail}</span>. Please check your inbox.
+                  </p>
+                  <Button variant="outline" className="w-full" onClick={() => { setShowForgotPassword(false); setResetSent(false); setResetEmail(''); }}>
+                    <ArrowLeft className="w-4 h-4 mr-2" /> Back to Sign In
+                  </Button>
+                </CardContent>
+              ) : (
+                <form onSubmit={handleForgotPassword}>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="login-email">Email</Label>
+                      <Label htmlFor="reset-email">Email Address</Label>
                       <div className="relative">
                         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input id="login-email" type="email" placeholder="Enter your email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="pl-10" required />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="login-password">Password</Label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input id="login-password" type={showLoginPassword ? 'text' : 'password'} placeholder="Enter your password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} className="pl-10 pr-10" required />
-                        <button type="button" onClick={() => setShowLoginPassword(!showLoginPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" tabIndex={-1}>
-                          {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
+                        <Input id="reset-email" type="email" placeholder="Enter your email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} className="pl-10" required />
                       </div>
                     </div>
                   </CardContent>
-                  <CardFooter>
+                  <CardFooter className="flex flex-col gap-3">
                     <Button type="submit" className="w-full gradient-primary" disabled={loading}>
                       {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                      Sign In
+                      Send Reset Link
+                    </Button>
+                    <Button type="button" variant="ghost" className="w-full text-sm" onClick={() => setShowForgotPassword(false)}>
+                      <ArrowLeft className="w-4 h-4 mr-2" /> Back to Sign In
                     </Button>
                   </CardFooter>
                 </form>
-              </TabsContent>
+              )}
+            </Card>
+          ) : (
+            <Card className="border-border/50 shadow-sm">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <CardHeader className="pb-4">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="login">Sign In</TabsTrigger>
+                    <TabsTrigger value="signup">Sign Up</TabsTrigger>
+                  </TabsList>
+                </CardHeader>
 
-              <TabsContent value="signup">
-                <form onSubmit={handleSignup}>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                <TabsContent value="login">
+                  <form onSubmit={handleLogin}>
+                    <CardContent className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="first-name">First Name</Label>
+                        <Label htmlFor="login-email">Email</Label>
                         <div className="relative">
-                          <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <Input id="first-name" placeholder="John" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="pl-10" required />
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input id="login-email" type="email" placeholder="Enter your email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="pl-10" required />
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="last-name">Last Name</Label>
-                        <Input id="last-name" placeholder="Doe" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="login-password">Password</Label>
+                          <button
+                            type="button"
+                            onClick={() => setShowForgotPassword(true)}
+                            className="text-xs text-primary hover:text-primary/80 transition-colors font-medium"
+                          >
+                            Forgot password?
+                          </button>
+                        </div>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input id="login-password" type={showLoginPassword ? 'text' : 'password'} placeholder="Enter your password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} className="pl-10 pr-10" required />
+                          <button type="button" onClick={() => setShowLoginPassword(!showLoginPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" tabIndex={-1}>
+                            {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-email">Email</Label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input id="signup-email" type="email" placeholder="john@example.com" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} className="pl-10" required />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-password">Password</Label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input id="signup-password" type={showSignupPassword ? 'text' : 'password'} placeholder="At least 6 characters" value={signupPassword} onChange={(e) => setSignupPassword(e.target.value)} className="pl-10 pr-10" required />
-                        <button type="button" onClick={() => setShowSignupPassword(!showSignupPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" tabIndex={-1}>
-                          {showSignupPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="confirm-password">Confirm Password</Label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input id="confirm-password" type={showConfirmPassword ? 'text' : 'password'} placeholder="Confirm your password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="pl-10 pr-10" required />
-                        <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" tabIndex={-1}>
-                          {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      The first registered user will automatically become the system administrator.
-                    </p>
-                  </CardContent>
-                  <CardFooter>
-                    <Button type="submit" className="w-full gradient-primary" disabled={loading}>
-                      {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                      Create Account
-                    </Button>
-                  </CardFooter>
-                </form>
-              </TabsContent>
-            </Tabs>
-          </Card>
-        </div>
-      </div>
+                    </CardContent>
+                    <CardFooter>
+                      <Button type="submit" className="w-full gradient-primary" disabled={loading}>
+                        {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        Sign In
+                      </Button>
+                    </CardFooter>
+                  </form>
+                </TabsContent>
 
-      {/* Right — Hero Image */}
-      <div className="hidden lg:block lg:w-1/2 relative overflow-hidden">
-        <img
-          src={heroImage}
-          alt="Medical facility"
-          className="absolute inset-0 w-full h-full object-cover transition-all duration-700"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-transparent" />
-        <div className="absolute bottom-10 left-10 right-10">
-          <p className="text-foreground/90 font-display text-xl font-semibold drop-shadow-lg">
-            {activeTab === 'login' ? 'Advanced Clinical Decision Support' : 'World-Class Cardiovascular Care'}
-          </p>
-          <p className="text-foreground/70 text-sm mt-2 drop-shadow">
-            {activeTab === 'login'
-              ? 'Empowering medical teams with real-time data and intelligent insights.'
-              : 'Comprehensive patient registry powering better surgical outcomes.'}
-          </p>
+                <TabsContent value="signup">
+                  <form onSubmit={handleSignup}>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="first-name">First Name</Label>
+                          <div className="relative">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input id="first-name" placeholder="John" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="pl-10" required />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="last-name">Last Name</Label>
+                          <Input id="last-name" placeholder="Doe" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-email">Email</Label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input id="signup-email" type="email" placeholder="john@example.com" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} className="pl-10" required />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-password">Password</Label>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input id="signup-password" type={showSignupPassword ? 'text' : 'password'} placeholder="At least 6 characters" value={signupPassword} onChange={(e) => setSignupPassword(e.target.value)} className="pl-10 pr-10" required />
+                          <button type="button" onClick={() => setShowSignupPassword(!showSignupPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" tabIndex={-1}>
+                            {showSignupPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="confirm-password">Confirm Password</Label>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input id="confirm-password" type={showConfirmPassword ? 'text' : 'password'} placeholder="Confirm your password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="pl-10 pr-10" required />
+                          <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" tabIndex={-1}>
+                            {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        The first registered user will automatically become the system administrator.
+                      </p>
+                    </CardContent>
+                    <CardFooter>
+                      <Button type="submit" className="w-full gradient-primary" disabled={loading}>
+                        {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        Create Account
+                      </Button>
+                    </CardFooter>
+                  </form>
+                </TabsContent>
+              </Tabs>
+            </Card>
+          )}
         </div>
       </div>
     </div>
