@@ -93,7 +93,7 @@ export default function IntraOperative() {
   });
 
   const completeSurgeryMutation = useMutation({
-    mutationFn: async (surgery: Surgery) => {
+    mutationFn: async (surgery: Surgery & { patient: Patient }) => {
       const { error } = await supabase
         .from('surgeries')
         .update({
@@ -103,12 +103,18 @@ export default function IntraOperative() {
         })
         .eq('id', surgery.id);
       if (error) throw error;
+      return surgery;
     },
-    onSuccess: () => {
+    onSuccess: (_, surgery) => {
       queryClient.invalidateQueries({ queryKey: ['intraop-surgeries'] });
+      queryClient.invalidateQueries({ queryKey: ['awaiting-signout'] });
       toast.success('Surgery completed. Proceed with Sign-Out checklist.');
       setNotesDialogOpen(false);
-      setSelectedSurgery(null);
+      // Automatically open sign-out dialog for the completed surgery
+      const completedSurgery = surgery as unknown as (Surgery & { patient: Patient });
+      setSelectedSurgery(completedSurgery);
+      setSignOutChecked(new Array(signOutChecklistItems.length).fill(false));
+      setSignOutDialogOpen(true);
     },
     onError: (error: Error) => toast.error(error.message),
   });
