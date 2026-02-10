@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Search, FileEdit, CheckCircle, BedDouble, ArrowRight, Trash2, Home, Mic, MicOff, Loader2, Sparkles, FileText } from 'lucide-react';
+import { Search, FileEdit, CheckCircle, BedDouble, ArrowRight, Trash2, Home, Mic, MicOff, Loader2, Sparkles, FileText, Download } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import type { Surgery, Patient } from '@/types/database';
 import { soundManager } from '@/lib/sounds';
@@ -325,6 +326,78 @@ export default function PostOperative() {
     }
   }, [rawTranscription, selectedSurgery]);
 
+  const exportReportAsPDF = useCallback(() => {
+    if (!postOpNotes || !selectedSurgery) return;
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    const maxWidth = pageWidth - margin * 2;
+    let y = 20;
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Post-Operative Surgical Report', margin, y);
+    y += 10;
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleString()}`, margin, y);
+    y += 8;
+
+    doc.setDrawColor(0, 136, 204);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 8;
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Patient Information', margin, y);
+    y += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`Name: ${selectedSurgery.patient?.first_name} ${selectedSurgery.patient?.last_name}`, margin, y); y += 5;
+    doc.text(`Patient No: ${selectedSurgery.patient?.patient_number}`, margin, y); y += 5;
+    if (selectedSurgery.patient?.blood_type) { doc.text(`Blood Type: ${selectedSurgery.patient.blood_type}`, margin, y); y += 5; }
+    y += 3;
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Procedure Details', margin, y);
+    y += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`Surgery: ${selectedSurgery.surgery_name}`, margin, y); y += 5;
+    doc.text(`Type: ${selectedSurgery.surgery_type}`, margin, y); y += 5;
+    if (selectedSurgery.complications) { doc.text(`Complications: ${selectedSurgery.complications}`, margin, y); y += 5; }
+    y += 5;
+
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 8;
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Report', margin, y);
+    y += 7;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+
+    const lines = doc.splitTextToSize(postOpNotes, maxWidth);
+    for (const line of lines) {
+      if (y > doc.internal.pageSize.getHeight() - 20) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.text(line, margin, y);
+      y += 5;
+    }
+
+    const patientName = `${selectedSurgery.patient?.first_name}_${selectedSurgery.patient?.last_name}`.replace(/\s+/g, '_');
+    doc.save(`PostOp_Report_${patientName}_${new Date().toISOString().slice(0, 10)}.pdf`);
+    toast.success('PDF exported successfully');
+  }, [postOpNotes, selectedSurgery]);
+
   const filteredSurgeries = surgeries?.filter((s) =>
     s.patient?.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.patient?.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -536,6 +609,11 @@ export default function PostOperative() {
 
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setNotesDialogOpen(false)}>Cancel</Button>
+              {postOpNotes && (
+                <Button variant="secondary" className="gap-1" onClick={() => exportReportAsPDF()}>
+                  <Download className="h-4 w-4" /> PDF
+                </Button>
+              )}
               <Button onClick={savePostOpNotes} disabled={updateSurgeryMutation.isPending || !postOpNotes.trim()}>
                 {updateSurgeryMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
                 Save Notes
