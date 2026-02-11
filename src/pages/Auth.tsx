@@ -40,6 +40,11 @@ export default function Auth() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
+  const [showUpdatePassword, setShowUpdatePassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -54,10 +59,42 @@ export default function Auth() {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
-    if (user && !authLoading) {
+    if (user && !authLoading && !showUpdatePassword) {
       navigate('/dashboard');
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, showUpdatePassword]);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setShowUpdatePassword(true);
+        setShowForgotPassword(false);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      toast({ title: 'Error', description: 'Password must be at least 6 characters.', variant: 'destructive' });
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      toast({ title: 'Error', description: "Passwords don't match.", variant: 'destructive' });
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setLoading(false);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Password Updated', description: 'Your password has been successfully changed.' });
+      setShowUpdatePassword(false);
+      navigate('/dashboard');
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,8 +213,45 @@ export default function Auth() {
             </p>
           </div>
 
-          {/* Forgot Password View */}
-          {showForgotPassword ? (
+          {/* Update Password View */}
+          {showUpdatePassword ? (
+            <Card className="border-border/50 shadow-sm">
+              <CardHeader className="text-center">
+                <h2 className="font-display text-lg font-semibold text-foreground">Set New Password</h2>
+                <p className="text-sm text-muted-foreground">Enter your new password below</p>
+              </CardHeader>
+              <form onSubmit={handleUpdatePassword}>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-password">New Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input id="new-password" type={showNewPassword ? 'text' : 'password'} placeholder="At least 6 characters" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="pl-10 pr-10" required />
+                      <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" tabIndex={-1}>
+                        {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-new-password">Confirm New Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input id="confirm-new-password" type={showConfirmNewPassword ? 'text' : 'password'} placeholder="Confirm your new password" value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} className="pl-10 pr-10" required />
+                      <button type="button" onClick={() => setShowConfirmNewPassword(!showConfirmNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" tabIndex={-1}>
+                        {showConfirmNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button type="submit" className="w-full gradient-primary" disabled={loading}>
+                    {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Update Password
+                  </Button>
+                </CardFooter>
+              </form>
+            </Card>
+          ) : showForgotPassword ? (
             <Card className="border-border/50 shadow-sm">
               <CardHeader className="text-center">
                 <h2 className="font-display text-lg font-semibold text-foreground">Reset Password</h2>
