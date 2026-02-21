@@ -24,11 +24,8 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
-  // If no role assigned yet, allow access (bypass role check temporarily)
-  // TODO: Re-enable role gating after first admin is set up
-
   // Check if user has required role
-  if (allowedRoles && !allowedRoles.includes(role)) {
+  if (allowedRoles && role && !allowedRoles.includes(role)) {
     return <Navigate to="/dashboard" replace />;
   }
 
