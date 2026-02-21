@@ -26,9 +26,10 @@ import { PatientVerificationPanel } from '@/components/preoperative/PatientVerif
 import { soundManager } from '@/lib/sounds';
 
 const surgeryTypes = [
-  { type: 'cardiac', procedures: ['Coronary Artery Bypass', 'Valve Replacement', 'Heart Transplant', 'Angioplasty', 'Pacemaker Implant'] },
-  { type: 'vascular', procedures: ['Carotid Endarterectomy', 'Aortic Aneurysm Repair', 'Peripheral Bypass', 'Embolectomy'] },
-  { type: 'diagnostic', procedures: ['Cardiac Catheterization', 'Electrophysiology Study', 'Biopsy'] },
+  { type: 'endoscopic', procedures: ['Cystoscopy', 'Ureteroscopy', 'TURP', 'TURBT', 'Ureteral Stent Placement'] },
+  { type: 'open', procedures: ['Radical Nephrectomy', 'Partial Nephrectomy', 'Radical Prostatectomy', 'Pyeloplasty', 'Cystectomy'] },
+  { type: 'laparoscopic', procedures: ['Laparoscopic Nephrectomy', 'Laparoscopic Prostatectomy', 'Laparoscopic Pyeloplasty', 'Adrenalectomy'] },
+  { type: 'diagnostic', procedures: ['Cystoscopy with Biopsy', 'Renal Biopsy', 'Urodynamic Study'] },
 ];
 
 // WHO Sign-In Checklist (Before induction of anesthesia)
@@ -692,8 +693,9 @@ export default function PreOperative() {
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cardiac">Cardiac</SelectItem>
-                    <SelectItem value="vascular">Vascular</SelectItem>
+                    <SelectItem value="endoscopic">Endoscopic</SelectItem>
+                    <SelectItem value="open">Open Surgery</SelectItem>
+                    <SelectItem value="laparoscopic">Laparoscopic</SelectItem>
                     <SelectItem value="diagnostic">Diagnostic</SelectItem>
                   </SelectContent>
                 </Select>
@@ -759,7 +761,7 @@ export default function PreOperative() {
                     <SelectItem value="OR-1">OR-1</SelectItem>
                     <SelectItem value="OR-2">OR-2</SelectItem>
                     <SelectItem value="OR-3">OR-3</SelectItem>
-                    <SelectItem value="Cath Lab">Cath Lab</SelectItem>
+                    <SelectItem value="Cysto Suite">Cystoscopy Suite</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

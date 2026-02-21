@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Heart } from 'lucide-react';
+import uroLogo from '@/assets/uro-logo.png';
 
 interface LoadingScreenProps {
   onFinished: () => void;
@@ -33,8 +33,8 @@ export function LoadingScreen({ onFinished }: LoadingScreenProps) {
     >
       {/* Animated Logo */}
       <div className="relative mb-8">
-        <div className="w-20 h-20 rounded-2xl gradient-primary flex items-center justify-center glow-primary animate-pulse">
-          <Heart className="w-10 h-10 text-primary-foreground" />
+        <div className="w-20 h-20 rounded-2xl flex items-center justify-center glow-primary animate-pulse">
+          <img src={uroLogo} alt="Uro-Registry" className="w-16 h-16 object-contain" />
         </div>
         {/* Rings */}
         <div className="absolute inset-0 -m-3 rounded-3xl border-2 border-primary/20 animate-ping" style={{ animationDuration: '2s' }} />
@@ -43,10 +43,10 @@ export function LoadingScreen({ onFinished }: LoadingScreenProps) {
 
       {/* Title */}
       <h1 className="font-display text-2xl font-bold text-foreground mb-2 animate-fade-in">
-        CardioRegistry
+        Uro-Registry
       </h1>
       <p className="text-sm text-muted-foreground mb-8 animate-fade-in">
-        Cardiovascular Patient Registry System
+        Urological Patient Registry System
       </p>
 
       {/* Progress Bar */}

@@ -755,7 +755,7 @@ export default function Teleconferencing() {
                   {viewPatient.chronic_conditions && viewPatient.chronic_conditions.length > 0 && (
                     <div><span className="text-xs text-muted-foreground">Chronic Conditions</span><div className="flex flex-wrap gap-1 mt-1">{viewPatient.chronic_conditions.map((c, i) => <Badge key={i} variant="outline" className="text-[10px]">{c}</Badge>)}</div></div>
                   )}
-                  {viewPatient.cardiovascular_history && <div><span className="text-xs text-muted-foreground">Cardiovascular History</span><p className="text-xs">{viewPatient.cardiovascular_history}</p></div>}
+                  {viewPatient.cardiovascular_history && <div><span className="text-xs text-muted-foreground">Urological History</span><p className="text-xs">{viewPatient.cardiovascular_history}</p></div>}
                   {viewPatient.previous_surgeries && <div><span className="text-xs text-muted-foreground">Previous Surgeries</span><p className="text-xs">{viewPatient.previous_surgeries}</p></div>}
                   {viewPatient.current_medications && <div><span className="text-xs text-muted-foreground">Current Medications</span><p className="text-xs">{viewPatient.current_medications}</p></div>}
                 </TabsContent>

@@ -152,7 +152,7 @@ export default function Settings() {
                 id="siteName"
                 value={siteName}
                 onChange={(e) => setSiteName(e.target.value)}
-                placeholder="CardioRegistry"
+                placeholder="Uro-Registry"
               />
               <p className="text-xs text-muted-foreground mt-1">
                 This name appears in the sidebar and reports

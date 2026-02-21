@@ -74,10 +74,11 @@ Format the report professionally with clear headers and bullet points where appr
     return new Response(JSON.stringify({ report }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error in transcribe-surgical-notes:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

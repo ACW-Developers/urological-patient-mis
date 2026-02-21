@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Heart, Loader2, Mail, Lock, User, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Loader2, Mail, Lock, User, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import uroLogo from '@/assets/uro-logo.png';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 import authLoginImg from '@/assets/auth-login.jpg';
@@ -186,13 +187,13 @@ export default function Auth() {
         />
         <div className="absolute inset-0 bg-gradient-to-r from-background/60 via-transparent to-background/30" />
         <div className="absolute bottom-10 left-10 right-10">
-          <p className="text-primary-foreground font-display text-xl font-semibold drop-shadow-lg">
-            {activeTab === 'login' ? 'Advanced Clinical Decision Support' : 'World-Class Cardiovascular Care'}
+           <p className="text-primary-foreground font-display text-xl font-semibold drop-shadow-lg">
+            {activeTab === 'login' ? 'Advanced Urological Care' : 'World-Class Urological Services'}
           </p>
           <p className="text-primary-foreground/80 text-sm mt-2 drop-shadow">
             {activeTab === 'login'
               ? 'Empowering medical teams with real-time data and intelligent insights.'
-              : 'Comprehensive patient registry powering better surgical outcomes.'}
+              : 'Comprehensive urological patient registry powering better surgical outcomes.'}
           </p>
         </div>
       </div>
@@ -202,14 +203,14 @@ export default function Auth() {
         <div className="w-full max-w-md animate-fade-in">
           {/* Logo */}
           <div className="mb-8 text-center">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl gradient-primary glow-primary mb-4">
-              <Heart className="w-6 h-6 text-primary-foreground" />
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl mb-4">
+              <img src={uroLogo} alt="Uro-Registry" className="w-12 h-12 object-contain" />
             </div>
             <h1 className="font-display text-2xl font-bold text-foreground">
-              {settings?.site_name || 'CardioRegistry'}
+              {settings?.site_name || 'Uro-Registry'}
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Cardiovascular Patient Registry System
+              Urological Patient Registry System
             </p>
           </div>
 

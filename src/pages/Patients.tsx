@@ -328,7 +328,7 @@ export default function Patients() {
 
               {selectedPatient.cardiovascular_history && (
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Cardiovascular History</p>
+                  <p className="text-sm text-muted-foreground mb-1">Urological History</p>
                   <p className="text-sm bg-muted/50 p-3 rounded-lg">{selectedPatient.cardiovascular_history}</p>
                 </div>
               )}
@@ -529,7 +529,7 @@ export default function Patients() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="cardiovascular_history">Cardiovascular History</Label>
+                    <Label htmlFor="cardiovascular_history">Urological History</Label>
                     <Textarea
                       id="cardiovascular_history"
                       value={editForm.cardiovascular_history || ''}
