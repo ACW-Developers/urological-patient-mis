@@ -10,7 +10,6 @@ import {
   Activity,
   TrendingUp,
   Clock,
-  Heart
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -59,7 +58,7 @@ export default function Dashboard() {
   ];
 
   const departmentData = [
-    { name: 'Cardiology', value: 45 },
+    { name: 'Urology', value: 45 },
     { name: 'ICU', value: 15 },
     { name: 'Surgery', value: 25 },
     { name: 'Recovery', value: 15 },
@@ -127,7 +126,7 @@ export default function Dashboard() {
         <div>
           <h1 className="page-title text-xl sm:text-2xl lg:text-3xl">Dashboard</h1>
           <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-            Overview of your cardiovascular patient registry
+            Overview of your urological patient registry
           </p>
         </div>
         <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
@@ -259,7 +258,7 @@ export default function Dashboard() {
       <Card className="glass-card">
         <CardHeader className="p-4 sm:p-6">
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <Heart className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+            <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
             Quick Actions
           </CardTitle>
         </CardHeader>

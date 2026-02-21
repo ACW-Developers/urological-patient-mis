@@ -289,9 +289,9 @@ export default function PatientDetail() {
                 )}
               </div>
 
-              {/* Cardiovascular History */}
+              {/* Urological History */}
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Cardiovascular History</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Urological History</p>
                 <p className="text-sm">{patient.cardiovascular_history || 'Not documented'}</p>
               </div>
 

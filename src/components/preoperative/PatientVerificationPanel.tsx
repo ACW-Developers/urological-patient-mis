@@ -319,7 +319,7 @@ export function PatientVerificationPanel({ patient, surgeryName, scheduledDate }
             <CardContent className="space-y-2 text-sm">
               {patient.cardiovascular_history && (
                 <div>
-                  <p className="font-medium text-muted-foreground">Cardiovascular History</p>
+                  <p className="font-medium text-muted-foreground">Urological History</p>
                   <p>{patient.cardiovascular_history}</p>
                 </div>
               )}

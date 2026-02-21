@@ -14,7 +14,6 @@ import {
   FlaskConical,
   Pill,
   Syringe,
-  Heart,
   ClipboardList,
   Settings,
   ChevronLeft,
@@ -29,6 +28,7 @@ import {
   Video,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import uroLogo from '@/assets/uro-logo.png';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 
@@ -65,7 +65,7 @@ const navItems: NavItem[] = [
   { label: 'Post-Operative', icon: BedDouble, path: '/post-operative', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'post_operative' },
   { label: 'ICU', icon: BedDouble, path: '/icu', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'icu' },
   { label: 'Ward', icon: BedDouble, path: '/ward', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'ward' },
-  { label: 'Follow-ups', icon: Heart, path: '/follow-ups', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'follow_ups' },
+  { label: 'Follow-ups', icon: Calendar, path: '/follow-ups', roles: ['admin', 'doctor', 'nurse'], moduleKey: 'follow_ups' },
   { label: 'Teleconferencing', icon: Video, path: '/teleconferencing', roles: ['admin', 'doctor'], moduleKey: 'teleconferencing' },
   { label: 'Reports', icon: BarChart3, path: '/reports', roles: ['admin', 'doctor', 'nurse', 'researcher', 'lab_technician', 'pharmacist'], moduleKey: 'reports' },
   { label: 'Downloads', icon: Download, path: '/downloads', roles: ['researcher'], moduleKey: 'downloads' },
@@ -106,11 +106,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       {/* Logo */}
       <div className="flex items-center h-14 px-3 border-b border-sidebar-border">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center glow-primary">
-            <Heart className="w-4 h-4 text-primary-foreground" />
-          </div>
+          <img src={uroLogo} alt="Uro-Registry" className="w-8 h-8 object-contain" />
           <span className="font-display font-bold text-sm text-sidebar-foreground truncate">
-            {settings?.site_name || 'CardioRegistry'}
+            {settings?.site_name || 'Uro-Registry'}
           </span>
         </div>
       </div>
@@ -176,18 +174,14 @@ function DesktopSidebar({ collapsed, setCollapsed }: { collapsed: boolean; setCo
       )}>
         {!collapsed && (
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center glow-primary">
-              <Heart className="w-4 h-4 text-primary-foreground" />
-            </div>
+            <img src={uroLogo} alt="Uro-Registry" className="w-8 h-8 object-contain" />
             <span className="font-display font-bold text-sm text-sidebar-foreground truncate">
-              {settings?.site_name || 'CardioRegistry'}
+              {settings?.site_name || 'Uro-Registry'}
             </span>
           </div>
         )}
         {collapsed && (
-          <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center glow-primary">
-            <Heart className="w-4 h-4 text-primary-foreground" />
-          </div>
+          <img src={uroLogo} alt="Uro-Registry" className="w-8 h-8 object-contain" />
         )}
       </div>
 

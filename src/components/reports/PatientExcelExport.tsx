@@ -54,7 +54,7 @@ const fieldGroups: FieldGroup[] = [
     fields: [
       { key: 'allergies', label: 'Allergies' },
       { key: 'chronic_conditions', label: 'Chronic Conditions' },
-      { key: 'cardiovascular_history', label: 'Cardiovascular History' },
+      { key: 'cardiovascular_history', label: 'Urological History' },
       { key: 'previous_surgeries', label: 'Previous Surgeries' },
       { key: 'current_medications', label: 'Current Medications' },
     ],
@@ -211,7 +211,7 @@ export default function PatientExcelExport() {
             // Medical history
             case 'allergies': row['Allergies'] = patient.allergies?.join(', ') || ''; break;
             case 'chronic_conditions': row['Chronic Conditions'] = patient.chronic_conditions?.join(', ') || ''; break;
-            case 'cardiovascular_history': row['Cardiovascular History'] = patient.cardiovascular_history || ''; break;
+            case 'cardiovascular_history': row['Urological History'] = patient.cardiovascular_history || ''; break;
             case 'previous_surgeries': row['Previous Surgeries'] = patient.previous_surgeries || ''; break;
             case 'current_medications': row['Current Medications'] = patient.current_medications || ''; break;
             

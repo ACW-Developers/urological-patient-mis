@@ -108,7 +108,7 @@ export default function PatientRegistration() {
             Patient Registration
           </h1>
           <p className="text-muted-foreground mt-1">
-            Register a new patient in the cardiovascular registry
+            Register a new patient in the urological registry
           </p>
         </div>
       </div>
@@ -282,10 +282,10 @@ export default function PatientRegistration() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="cardiovascularHistory">Cardiovascular History</Label>
+              <Label htmlFor="cardiovascularHistory">Urological History</Label>
               <Textarea
                 id="cardiovascularHistory"
-                placeholder="Previous heart conditions, treatments, etc."
+                placeholder="Previous urological conditions, treatments, etc."
                 value={formData.cardiovascularHistory}
                 onChange={(e) => handleChange('cardiovascularHistory', e.target.value)}
                 rows={3}

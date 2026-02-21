@@ -32,10 +32,10 @@ import type { Patient, Vitals, LabTest, LabResult } from '@/types/database';
 import { notifyLabTechnicians } from '@/lib/notifications';
 
 const labTestTypes = [
-  { type: 'Blood Panel', tests: ['Complete Blood Count (CBC)', 'Lipid Panel', 'Basic Metabolic Panel', 'Comprehensive Metabolic Panel'] },
-  { type: 'Cardiac Markers', tests: ['Troponin', 'BNP', 'CK-MB', 'Myoglobin'] },
-  { type: 'Coagulation', tests: ['PT/INR', 'PTT', 'D-Dimer', 'Fibrinogen'] },
-  { type: 'Imaging', tests: ['Echocardiogram', 'ECG', 'Chest X-Ray', 'CT Angiography'] },
+  { type: 'Blood Panel', tests: ['Complete Blood Count (CBC)', 'Renal Function Panel', 'Basic Metabolic Panel', 'Comprehensive Metabolic Panel'] },
+  { type: 'Urological Markers', tests: ['PSA', 'Urine Cytology', 'Creatinine', 'BUN'] },
+  { type: 'Urine Tests', tests: ['Urinalysis', 'Urine Culture', '24-Hour Urine Collection', 'Urine Protein'] },
+  { type: 'Imaging', tests: ['Renal Ultrasound', 'CT Urogram', 'MRI Pelvis', 'IVP'] },
 ];
 
 interface DoctorConsultation {
@@ -544,7 +544,7 @@ export default function DoctorConsultationPage() {
                           </div>
                           <Separator />
                           <div>
-                            <span className="text-muted-foreground">Cardiovascular History:</span>
+                            <span className="text-muted-foreground">Urological History:</span>
                             <p className="mt-1">{selectedPatient.cardiovascular_history || 'None reported'}</p>
                           </div>
                           <Separator />
@@ -980,9 +980,9 @@ export default function DoctorConsultationPage() {
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cardiac">Cardiac Surgery</SelectItem>
-                    <SelectItem value="vascular">Vascular Surgery</SelectItem>
-                    <SelectItem value="interventional">Interventional Procedure</SelectItem>
+                    <SelectItem value="endoscopic">Endoscopic Procedure</SelectItem>
+                    <SelectItem value="open">Open Surgery</SelectItem>
+                    <SelectItem value="laparoscopic">Laparoscopic Surgery</SelectItem>
                     <SelectItem value="diagnostic">Diagnostic Procedure</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
@@ -1093,12 +1093,12 @@ export default function DoctorConsultationPage() {
                     <SelectValue placeholder="Assign OR (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="OR-1">OR-1 (Cardiac)</SelectItem>
-                    <SelectItem value="OR-2">OR-2 (Cardiac)</SelectItem>
-                    <SelectItem value="OR-3">OR-3 (Vascular)</SelectItem>
+                    <SelectItem value="OR-1">OR-1 (Urology)</SelectItem>
+                    <SelectItem value="OR-2">OR-2 (Urology)</SelectItem>
+                    <SelectItem value="OR-3">OR-3 (Endoscopy)</SelectItem>
                     <SelectItem value="OR-4">OR-4 (General)</SelectItem>
-                    <SelectItem value="CATH-1">Cath Lab 1</SelectItem>
-                    <SelectItem value="CATH-2">Cath Lab 2</SelectItem>
+                    <SelectItem value="CYSTO-1">Cystoscopy Suite 1</SelectItem>
+                    <SelectItem value="CYSTO-2">Cystoscopy Suite 2</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -1,7 +1,7 @@
 // Sound effects utility for futuristic UI feedback
 // Uses Web Audio API for generating sounds programmatically
 
-const SOUND_STORAGE_KEY = 'cardioregistry_sound_enabled';
+const SOUND_STORAGE_KEY = 'uroregistry_sound_enabled';
 
 class SoundManager {
   private audioContext: AudioContext | null = null;
