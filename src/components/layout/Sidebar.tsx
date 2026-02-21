@@ -106,7 +106,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       {/* Logo */}
       <div className="flex items-center h-14 px-3 border-b border-sidebar-border">
         <div className="flex items-center gap-2">
-          <img src={uroLogo} alt="Uro-Registry" className="w-8 h-8 object-contain" />
+          <img src={uroLogo} alt="Uro-Registry" className="w-8 h-8 object-contain rounded-md bg-white/80 p-0.5" />
           <span className="font-display font-bold text-sm text-sidebar-foreground truncate">
             {settings?.site_name || 'Uro-Registry'}
           </span>
@@ -174,14 +174,14 @@ function DesktopSidebar({ collapsed, setCollapsed }: { collapsed: boolean; setCo
       )}>
         {!collapsed && (
           <div className="flex items-center gap-2">
-            <img src={uroLogo} alt="Uro-Registry" className="w-8 h-8 object-contain" />
+            <img src={uroLogo} alt="Uro-Registry" className="w-8 h-8 object-contain rounded-md bg-white/80 p-0.5" />
             <span className="font-display font-bold text-sm text-sidebar-foreground truncate">
               {settings?.site_name || 'Uro-Registry'}
             </span>
           </div>
         )}
         {collapsed && (
-          <img src={uroLogo} alt="Uro-Registry" className="w-8 h-8 object-contain" />
+          <img src={uroLogo} alt="Uro-Registry" className="w-8 h-8 object-contain rounded-md bg-white/80 p-0.5" />
         )}
       </div>
 
