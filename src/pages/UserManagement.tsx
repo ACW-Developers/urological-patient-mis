@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -55,6 +55,23 @@ export default function UserManagement() {
       })) as (Profile & { role?: UserRole })[];
     },
   });
+
+  // Realtime subscription for new accounts
+  useEffect(() => {
+    const channel = supabase
+      .channel('user-management-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['users-with-roles'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_roles' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['users-with-roles'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
