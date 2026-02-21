@@ -1,7 +1,8 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppRole } from '@/types/database';
-import { Loader2 } from 'lucide-react';
+import { Loader2, LogOut } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -9,7 +10,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-  const { user, role, loading } = useAuth();
+  const { user, role, loading, signOut } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -39,6 +40,14 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
         >
           Refresh to check again
         </button>
+        <Button
+          variant="outline"
+          onClick={signOut}
+          className="mt-3"
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          Sign Out
+        </Button>
       </div>
     );
   }
