@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { UserPlus, Loader2, User, Phone, Stethoscope, ClipboardList, FileCheck, BedDouble } from 'lucide-react';
+import { UserPlus, Loader2, User, Phone, Stethoscope, ClipboardList, FileCheck, BedDouble, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function PatientRegistration() {
@@ -28,10 +28,18 @@ export default function PatientRegistration() {
     phone: '',
     county: '',
     subCounty: '',
+    nextOfKinName: '',
+    nextOfKinRelationship: '',
+    nextOfKinPhone: '',
     hivStatus: '',
     diagnosis: '',
+    procedurePerformed: '',
     treatment: '',
     nutritionalSupport: '',
+    wardNumber: '',
+    hgb: '',
+    gxm: '',
+    uecs: '',
     dischargeDate: '',
     outcome: '',
     causeOfDeath: '',
@@ -48,7 +56,6 @@ export default function PatientRegistration() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  // Calculate date_of_birth from age for DB storage
   const dobFromAge = (age: string) => {
     if (!age) return new Date().toISOString().split('T')[0];
     const today = new Date();
@@ -72,10 +79,18 @@ export default function PatientRegistration() {
         phone: formData.phone,
         county: formData.county || null,
         sub_county: formData.subCounty || null,
+        next_of_kin_name: formData.nextOfKinName || null,
+        next_of_kin_relationship: formData.nextOfKinRelationship || null,
+        next_of_kin_phone: formData.nextOfKinPhone || null,
         hiv_status: formData.hivStatus || null,
         diagnosis: formData.diagnosis || null,
+        procedure_performed: formData.procedurePerformed || null,
         treatment: formData.treatment || null,
         nutritional_support: formData.nutritionalSupport || null,
+        ward_number: formData.wardNumber || null,
+        hgb: formData.hgb || null,
+        gxm: formData.gxm || null,
+        uecs: formData.uecs || null,
         admission_date: formData.admissionDate || null,
         discharge_date: formData.dischargeDate || null,
         outcome: formData.outcome || null,
@@ -161,11 +176,20 @@ export default function PatientRegistration() {
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
                 <SelectContent>
-                  {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((type) => (
+                  {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Unknown'].map((type) => (
                     <SelectItem key={type} value={type}>{type}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="wardNumber">Ward Number</Label>
+              <Input
+                id="wardNumber"
+                placeholder="e.g., Ward 5"
+                value={formData.wardNumber}
+                onChange={(e) => handleChange('wardNumber', e.target.value)}
+              />
             </div>
           </CardContent>
         </Card>
@@ -181,41 +205,20 @@ export default function PatientRegistration() {
           <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="firstName">First Name *</Label>
-              <Input
-                id="firstName"
-                value={formData.firstName}
-                onChange={(e) => handleChange('firstName', e.target.value)}
-                required
-              />
+              <Input id="firstName" value={formData.firstName} onChange={(e) => handleChange('firstName', e.target.value)} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="lastName">Last Name *</Label>
-              <Input
-                id="lastName"
-                value={formData.lastName}
-                onChange={(e) => handleChange('lastName', e.target.value)}
-                required
-              />
+              <Input id="lastName" value={formData.lastName} onChange={(e) => handleChange('lastName', e.target.value)} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="age">Age *</Label>
-              <Input
-                id="age"
-                type="number"
-                placeholder="e.g., 45"
-                value={formData.age}
-                onChange={(e) => handleChange('age', e.target.value)}
-                min="0"
-                max="150"
-                required
-              />
+              <Input id="age" type="number" placeholder="e.g., 45" value={formData.age} onChange={(e) => handleChange('age', e.target.value)} min="0" max="150" required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="gender">Sex *</Label>
               <Select value={formData.gender} onValueChange={(v) => handleChange('gender', v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select sex" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select sex" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Male">Male</SelectItem>
                   <SelectItem value="Female">Female</SelectItem>
@@ -225,14 +228,7 @@ export default function PatientRegistration() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Telephone Number *</Label>
-              <Input
-                id="phone"
-                type="tel"
-                placeholder="e.g., 0712345678"
-                value={formData.phone}
-                onChange={(e) => handleChange('phone', e.target.value)}
-                required
-              />
+              <Input id="phone" type="tel" placeholder="e.g., 0712345678" value={formData.phone} onChange={(e) => handleChange('phone', e.target.value)} required />
             </div>
           </CardContent>
         </Card>
@@ -248,21 +244,35 @@ export default function PatientRegistration() {
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="county">County</Label>
-              <Input
-                id="county"
-                placeholder="e.g., Nairobi"
-                value={formData.county}
-                onChange={(e) => handleChange('county', e.target.value)}
-              />
+              <Input id="county" placeholder="e.g., Nairobi" value={formData.county} onChange={(e) => handleChange('county', e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="subCounty">Sub-County</Label>
-              <Input
-                id="subCounty"
-                placeholder="e.g., Westlands"
-                value={formData.subCounty}
-                onChange={(e) => handleChange('subCounty', e.target.value)}
-              />
+              <Input id="subCounty" placeholder="e.g., Westlands" value={formData.subCounty} onChange={(e) => handleChange('subCounty', e.target.value)} />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Next of Kin */}
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Users className="w-5 h-5 text-primary" />
+              Next of Kin
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="nextOfKinName">Name</Label>
+              <Input id="nextOfKinName" placeholder="Full name" value={formData.nextOfKinName} onChange={(e) => handleChange('nextOfKinName', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="nextOfKinRelationship">Relationship</Label>
+              <Input id="nextOfKinRelationship" placeholder="e.g., Spouse, Parent" value={formData.nextOfKinRelationship} onChange={(e) => handleChange('nextOfKinRelationship', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="nextOfKinPhone">Phone Number</Label>
+              <Input id="nextOfKinPhone" type="tel" placeholder="e.g., 0712345678" value={formData.nextOfKinPhone} onChange={(e) => handleChange('nextOfKinPhone', e.target.value)} />
             </div>
           </CardContent>
         </Card>
@@ -280,9 +290,7 @@ export default function PatientRegistration() {
               <div className="space-y-2">
                 <Label htmlFor="hivStatus">HIV Status</Label>
                 <Select value={formData.hivStatus} onValueChange={(v) => handleChange('hivStatus', v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Positive">Positive</SelectItem>
                     <SelectItem value="Negative">Negative</SelectItem>
@@ -292,53 +300,42 @@ export default function PatientRegistration() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="allergies">Allergies (comma-separated)</Label>
-                <Input
-                  id="allergies"
-                  placeholder="e.g., Penicillin, Aspirin"
-                  value={formData.allergies}
-                  onChange={(e) => handleChange('allergies', e.target.value)}
-                />
+                <Input id="allergies" placeholder="e.g., Penicillin, Aspirin" value={formData.allergies} onChange={(e) => handleChange('allergies', e.target.value)} />
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="diagnosis">Diagnosis *</Label>
-              <Textarea
-                id="diagnosis"
-                placeholder="Enter patient diagnosis"
-                value={formData.diagnosis}
-                onChange={(e) => handleChange('diagnosis', e.target.value)}
-                rows={2}
-                required
-              />
+              <Textarea id="diagnosis" placeholder="Enter patient diagnosis" value={formData.diagnosis} onChange={(e) => handleChange('diagnosis', e.target.value)} rows={2} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="procedurePerformed">Procedure</Label>
+              <Textarea id="procedurePerformed" placeholder="Describe the procedure" value={formData.procedurePerformed} onChange={(e) => handleChange('procedurePerformed', e.target.value)} rows={2} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="treatment">Treatment</Label>
-              <Textarea
-                id="treatment"
-                placeholder="Describe treatment plan"
-                value={formData.treatment}
-                onChange={(e) => handleChange('treatment', e.target.value)}
-                rows={2}
-              />
+              <Textarea id="treatment" placeholder="Describe treatment plan" value={formData.treatment} onChange={(e) => handleChange('treatment', e.target.value)} rows={2} />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="hgb">HGB</Label>
+                <Input id="hgb" placeholder="e.g., 12.5 g/dL" value={formData.hgb} onChange={(e) => handleChange('hgb', e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="gxm">GXM</Label>
+                <Input id="gxm" placeholder="e.g., Compatible" value={formData.gxm} onChange={(e) => handleChange('gxm', e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="uecs">UECS</Label>
+                <Input id="uecs" placeholder="e.g., Normal" value={formData.uecs} onChange={(e) => handleChange('uecs', e.target.value)} />
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="nutritionalSupport">Nutritional Support</Label>
-              <Input
-                id="nutritionalSupport"
-                placeholder="e.g., High-protein diet, IV fluids"
-                value={formData.nutritionalSupport}
-                onChange={(e) => handleChange('nutritionalSupport', e.target.value)}
-              />
+              <Input id="nutritionalSupport" placeholder="e.g., High-protein diet, IV fluids" value={formData.nutritionalSupport} onChange={(e) => handleChange('nutritionalSupport', e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="currentMedications">Current Medications</Label>
-              <Textarea
-                id="currentMedications"
-                placeholder="List current medications and dosages"
-                value={formData.currentMedications}
-                onChange={(e) => handleChange('currentMedications', e.target.value)}
-                rows={2}
-              />
+              <Textarea id="currentMedications" placeholder="List current medications and dosages" value={formData.currentMedications} onChange={(e) => handleChange('currentMedications', e.target.value)} rows={2} />
             </div>
           </CardContent>
         </Card>
@@ -355,19 +352,12 @@ export default function PatientRegistration() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="dischargeDate">Date of Discharge</Label>
-                <Input
-                  id="dischargeDate"
-                  type="date"
-                  value={formData.dischargeDate}
-                  onChange={(e) => handleChange('dischargeDate', e.target.value)}
-                />
+                <Input id="dischargeDate" type="date" value={formData.dischargeDate} onChange={(e) => handleChange('dischargeDate', e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="outcome">Outcome</Label>
                 <Select value={formData.outcome} onValueChange={(v) => handleChange('outcome', v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select outcome" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select outcome" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Alive">Alive</SelectItem>
                     <SelectItem value="Dead">Dead</SelectItem>
@@ -376,14 +366,8 @@ export default function PatientRegistration() {
               </div>
               <div className="flex items-end pb-2">
                 <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="icuReferral"
-                    checked={formData.icuReferral}
-                    onCheckedChange={(checked) => handleChange('icuReferral', checked as boolean)}
-                  />
-                  <Label htmlFor="icuReferral" className="cursor-pointer">
-                    Referral from ICU
-                  </Label>
+                  <Checkbox id="icuReferral" checked={formData.icuReferral} onCheckedChange={(checked) => handleChange('icuReferral', checked as boolean)} />
+                  <Label htmlFor="icuReferral" className="cursor-pointer">Referral from ICU</Label>
                 </div>
               </div>
             </div>
@@ -391,13 +375,7 @@ export default function PatientRegistration() {
             {formData.outcome === 'Dead' && (
               <div className="space-y-2 animate-fade-in">
                 <Label htmlFor="causeOfDeath">Cause of Death</Label>
-                <Textarea
-                  id="causeOfDeath"
-                  placeholder="Describe cause of death"
-                  value={formData.causeOfDeath}
-                  onChange={(e) => handleChange('causeOfDeath', e.target.value)}
-                  rows={2}
-                />
+                <Textarea id="causeOfDeath" placeholder="Describe cause of death" value={formData.causeOfDeath} onChange={(e) => handleChange('causeOfDeath', e.target.value)} rows={2} />
               </div>
             )}
 
@@ -405,9 +383,7 @@ export default function PatientRegistration() {
               <div className="space-y-2">
                 <Label htmlFor="surgeryStatus">Did the patient proceed for surgery?</Label>
                 <Select value={formData.surgeryStatus} onValueChange={(v) => handleChange('surgeryStatus', v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Yes - Surgery Done">Yes - Surgery Done</SelectItem>
                     <SelectItem value="No - Surgery Not Done">No - Surgery Not Done</SelectItem>
@@ -417,13 +393,7 @@ export default function PatientRegistration() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="extraNotes">Extra Notes</Label>
-                <Textarea
-                  id="extraNotes"
-                  placeholder="Any additional remarks..."
-                  value={formData.extraNotes}
-                  onChange={(e) => handleChange('extraNotes', e.target.value)}
-                  rows={3}
-                />
+                <Textarea id="extraNotes" placeholder="Any additional remarks..." value={formData.extraNotes} onChange={(e) => handleChange('extraNotes', e.target.value)} rows={3} />
               </div>
             </div>
           </CardContent>
@@ -446,11 +416,10 @@ export default function PatientRegistration() {
               />
               <div>
                 <Label htmlFor="consentResearch" className="cursor-pointer font-medium">
-                  Consent for Treatment & Research Participation
+                  I confirm the patient has given consent for research participation
                 </Label>
                 <p className="text-sm text-muted-foreground mt-1">
-                  I consent to receive medical treatment at this facility and authorize the use of my
-                  medical records and biological samples for diagnostic purposes and approved research studies.
+                  This includes consent for data collection, analysis, and publication of anonymized results.
                 </p>
               </div>
             </div>
@@ -458,12 +427,10 @@ export default function PatientRegistration() {
         </Card>
 
         {/* Submit */}
-        <div className="flex justify-end gap-4">
-          <Button type="button" variant="outline" onClick={() => navigate('/patients')}>
-            Cancel
-          </Button>
-          <Button type="submit" className="gradient-primary" disabled={loading}>
-            {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+        <div className="flex gap-4 justify-end">
+          <Button type="button" variant="outline" onClick={() => navigate('/patients')}>Cancel</Button>
+          <Button type="submit" disabled={loading} className="gradient-primary">
+            {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserPlus className="w-4 h-4 mr-2" />}
             Register Patient
           </Button>
         </div>

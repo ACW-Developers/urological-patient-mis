@@ -675,23 +675,31 @@ export type Database = {
           emergency_contact_relationship: string | null
           first_name: string
           gender: string
+          gxm: string | null
+          hgb: string | null
           hiv_status: string | null
           icu_referral: boolean | null
           id: string
           inpatient_number: string | null
           last_name: string
           national_id: string | null
+          next_of_kin_name: string | null
+          next_of_kin_phone: string | null
+          next_of_kin_relationship: string | null
           nutritional_support: string | null
           outcome: string | null
           patient_number: string
           phone: string
           previous_surgeries: string | null
+          procedure_performed: string | null
           registered_by: string | null
           remarks: string | null
           status: string | null
           sub_county: string | null
           treatment: string | null
+          uecs: string | null
           updated_at: string
+          ward_number: string | null
         }
         Insert: {
           address?: string | null
@@ -717,23 +725,31 @@ export type Database = {
           emergency_contact_relationship?: string | null
           first_name: string
           gender: string
+          gxm?: string | null
+          hgb?: string | null
           hiv_status?: string | null
           icu_referral?: boolean | null
           id?: string
           inpatient_number?: string | null
           last_name: string
           national_id?: string | null
+          next_of_kin_name?: string | null
+          next_of_kin_phone?: string | null
+          next_of_kin_relationship?: string | null
           nutritional_support?: string | null
           outcome?: string | null
           patient_number: string
           phone: string
           previous_surgeries?: string | null
+          procedure_performed?: string | null
           registered_by?: string | null
           remarks?: string | null
           status?: string | null
           sub_county?: string | null
           treatment?: string | null
+          uecs?: string | null
           updated_at?: string
+          ward_number?: string | null
         }
         Update: {
           address?: string | null
@@ -759,23 +775,31 @@ export type Database = {
           emergency_contact_relationship?: string | null
           first_name?: string
           gender?: string
+          gxm?: string | null
+          hgb?: string | null
           hiv_status?: string | null
           icu_referral?: boolean | null
           id?: string
           inpatient_number?: string | null
           last_name?: string
           national_id?: string | null
+          next_of_kin_name?: string | null
+          next_of_kin_phone?: string | null
+          next_of_kin_relationship?: string | null
           nutritional_support?: string | null
           outcome?: string | null
           patient_number?: string
           phone?: string
           previous_surgeries?: string | null
+          procedure_performed?: string | null
           registered_by?: string | null
           remarks?: string | null
           status?: string | null
           sub_county?: string | null
           treatment?: string | null
+          uecs?: string | null
           updated_at?: string
+          ward_number?: string | null
         }
         Relationships: []
       }
