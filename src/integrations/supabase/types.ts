@@ -653,89 +653,128 @@ export type Database = {
       patients: {
         Row: {
           address: string | null
+          admission_date: string | null
           allergies: string[] | null
           blood_type: string | null
           cardiovascular_history: string | null
+          cause_of_death: string | null
           chronic_conditions: string[] | null
           city: string | null
           consent_biological_samples: boolean | null
           consent_date: string | null
           consent_treatment: boolean | null
+          county: string | null
           created_at: string
           current_medications: string | null
           date_of_birth: string
+          diagnosis: string | null
+          discharge_date: string | null
           email: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
           emergency_contact_relationship: string | null
           first_name: string
           gender: string
+          hiv_status: string | null
+          icu_referral: boolean | null
           id: string
+          inpatient_number: string | null
           last_name: string
           national_id: string | null
+          nutritional_support: string | null
+          outcome: string | null
           patient_number: string
           phone: string
           previous_surgeries: string | null
           registered_by: string | null
+          remarks: string | null
           status: string | null
+          sub_county: string | null
+          treatment: string | null
           updated_at: string
         }
         Insert: {
           address?: string | null
+          admission_date?: string | null
           allergies?: string[] | null
           blood_type?: string | null
           cardiovascular_history?: string | null
+          cause_of_death?: string | null
           chronic_conditions?: string[] | null
           city?: string | null
           consent_biological_samples?: boolean | null
           consent_date?: string | null
           consent_treatment?: boolean | null
+          county?: string | null
           created_at?: string
           current_medications?: string | null
           date_of_birth: string
+          diagnosis?: string | null
+          discharge_date?: string | null
           email?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           emergency_contact_relationship?: string | null
           first_name: string
           gender: string
+          hiv_status?: string | null
+          icu_referral?: boolean | null
           id?: string
+          inpatient_number?: string | null
           last_name: string
           national_id?: string | null
+          nutritional_support?: string | null
+          outcome?: string | null
           patient_number: string
           phone: string
           previous_surgeries?: string | null
           registered_by?: string | null
+          remarks?: string | null
           status?: string | null
+          sub_county?: string | null
+          treatment?: string | null
           updated_at?: string
         }
         Update: {
           address?: string | null
+          admission_date?: string | null
           allergies?: string[] | null
           blood_type?: string | null
           cardiovascular_history?: string | null
+          cause_of_death?: string | null
           chronic_conditions?: string[] | null
           city?: string | null
           consent_biological_samples?: boolean | null
           consent_date?: string | null
           consent_treatment?: boolean | null
+          county?: string | null
           created_at?: string
           current_medications?: string | null
           date_of_birth?: string
+          diagnosis?: string | null
+          discharge_date?: string | null
           email?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           emergency_contact_relationship?: string | null
           first_name?: string
           gender?: string
+          hiv_status?: string | null
+          icu_referral?: boolean | null
           id?: string
+          inpatient_number?: string | null
           last_name?: string
           national_id?: string | null
+          nutritional_support?: string | null
+          outcome?: string | null
           patient_number?: string
           phone?: string
           previous_surgeries?: string | null
           registered_by?: string | null
+          remarks?: string | null
           status?: string | null
+          sub_county?: string | null
+          treatment?: string | null
           updated_at?: string
         }
         Relationships: []
