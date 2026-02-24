@@ -23,7 +23,7 @@ export default function PatientRegistration() {
     inpatientNumber: '',
     firstName: '',
     lastName: '',
-    dateOfBirth: '',
+    age: '',
     gender: '',
     phone: '',
     county: '',
@@ -48,15 +48,12 @@ export default function PatientRegistration() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  // Calculate age from DOB
-  const calculateAge = (dob: string) => {
-    if (!dob) return '';
+  // Calculate date_of_birth from age for DB storage
+  const dobFromAge = (age: string) => {
+    if (!age) return new Date().toISOString().split('T')[0];
     const today = new Date();
-    const birth = new Date(dob);
-    let age = today.getFullYear() - birth.getFullYear();
-    const m = today.getMonth() - birth.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-    return age.toString();
+    today.setFullYear(today.getFullYear() - parseInt(age));
+    return today.toISOString().split('T')[0];
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -70,7 +67,7 @@ export default function PatientRegistration() {
         patient_number: patientNumber,
         first_name: formData.firstName,
         last_name: formData.lastName,
-        date_of_birth: formData.dateOfBirth,
+        date_of_birth: dobFromAge(formData.age),
         gender: formData.gender,
         phone: formData.phone,
         county: formData.county || null,
@@ -201,22 +198,16 @@ export default function PatientRegistration() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="dateOfBirth">Date of Birth *</Label>
+              <Label htmlFor="age">Age *</Label>
               <Input
-                id="dateOfBirth"
-                type="date"
-                value={formData.dateOfBirth}
-                onChange={(e) => handleChange('dateOfBirth', e.target.value)}
+                id="age"
+                type="number"
+                placeholder="e.g., 45"
+                value={formData.age}
+                onChange={(e) => handleChange('age', e.target.value)}
+                min="0"
+                max="150"
                 required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Age</Label>
-              <Input
-                value={calculateAge(formData.dateOfBirth)}
-                placeholder="Auto-calculated"
-                readOnly
-                className="bg-muted"
               />
             </div>
             <div className="space-y-2">
