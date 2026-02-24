@@ -36,7 +36,8 @@ export default function PatientRegistration() {
     outcome: '',
     causeOfDeath: '',
     icuReferral: false,
-    remarks: '',
+    surgeryStatus: '',
+    extraNotes: '',
     bloodType: '',
     allergies: '',
     currentMedications: '',
@@ -83,7 +84,7 @@ export default function PatientRegistration() {
         outcome: formData.outcome || null,
         cause_of_death: formData.outcome === 'Dead' ? (formData.causeOfDeath || null) : null,
         icu_referral: formData.icuReferral,
-        remarks: formData.remarks || null,
+        remarks: [formData.surgeryStatus, formData.extraNotes].filter(Boolean).join(' | ') || null,
         inpatient_number: formData.inpatientNumber || null,
         blood_type: formData.bloodType || null,
         allergies: formData.allergies ? formData.allergies.split(',').map(a => a.trim()) : null,
@@ -409,15 +410,30 @@ export default function PatientRegistration() {
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="remarks">Remarks (surgery status, extra notes)</Label>
-              <Textarea
-                id="remarks"
-                placeholder="e.g., Scheduled for surgery, post-op recovery notes..."
-                value={formData.remarks}
-                onChange={(e) => handleChange('remarks', e.target.value)}
-                rows={3}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="surgeryStatus">Did the patient proceed for surgery?</Label>
+                <Select value={formData.surgeryStatus} onValueChange={(v) => handleChange('surgeryStatus', v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Yes - Surgery Done">Yes - Surgery Done</SelectItem>
+                    <SelectItem value="No - Surgery Not Done">No - Surgery Not Done</SelectItem>
+                    <SelectItem value="Scheduled for Surgery">Scheduled for Surgery</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="extraNotes">Extra Notes</Label>
+                <Textarea
+                  id="extraNotes"
+                  placeholder="Any additional remarks..."
+                  value={formData.extraNotes}
+                  onChange={(e) => handleChange('extraNotes', e.target.value)}
+                  rows={3}
+                />
+              </div>
             </div>
           </CardContent>
         </Card>
